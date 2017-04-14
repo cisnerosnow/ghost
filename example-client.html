@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Ghost Example Client</title>
+    </head>
+    <body>
+        <button type="button">Test it</button>
+        Click the button and open your browser console to see the results
+
+        <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+        <script type="text/javascript">
+            $(function() {
+                $("button").click(function() {
+                    $.ajax({
+                        url: "example-api.php",
+                        type: "POST",
+                        cache: false,
+                        data: {
+                            option: "casper",
+                            params: {
+                                nombre: "Martin",
+                                paterno: "Cisneros",
+                                materno: "Capistrán",
+                                username: "martinciscap",
+                                password: "123456789",
+                                email: "martin.cisneros@gmail.com"
+                            }
+                        },
+                        success: function(data) {
+                            console.info(data);
+                        },
+                        error: function(a, b, c) {
+                            console.error(a, b, c);
+                        }
+                    });
+                });
+            });
+        </script>
+    </body>
+</html>
