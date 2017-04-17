@@ -11,20 +11,20 @@
         <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
         <script type="text/javascript">
             $(function() {
+                //Create Read Update Delte
+                //POST GET PUT delete
+                //INSERT SELECT UPDATE DELETE
                 $("button").click(function() {
                     $.ajax({
                         url: "example-api.php",
-                        type: "POST",
+                        type: "POST", //"DELETE", "PUT", "GET"
                         cache: false,
                         data: {
-                            option: "casper",
+                            option: "employee",
                             params: {
-                                nombre: "Martin",
-                                paterno: "Cisneros",
-                                materno: "Capistrán",
-                                username: "martinciscap",
-                                password: "123456789",
-                                email: "martin.cisneros@gmail.com"
+                                //id: 1, //id is used when DELETE, PUT AND DELETE
+                                name: "Martin",
+                                lastname: "Cisneros",
                             }
                         },
                         success: function(data) {
