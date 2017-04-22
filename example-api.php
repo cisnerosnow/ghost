@@ -1,4 +1,5 @@
 <?php
+header('Access-Control-Allow-Origin: *'); //you gotta pay attention to this, using * in production is a bad idea
 require 'ghost.php'; //we are invoking a ghost D:
 
 $ghost = new Ghost();
