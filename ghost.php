@@ -23,6 +23,7 @@ class Ghost
     }
 
     public function hello() {
+        echo 'Hello from the other side';
     }
 
     public function sql($method, $option, $params) {
