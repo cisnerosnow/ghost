@@ -22,6 +22,9 @@ class Ghost
         return mysqli_connect($this->host, $this->user, $this->pass, $this->db_name);
     }
 
+    public function hello() {
+    }
+
     public function sql($method, $option, $params) {
         //return call_user_func("sql_$method");
         $sql = '';
