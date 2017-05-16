@@ -100,15 +100,24 @@ class Ghost
     }
 
     public function save_file($param, $path = NULL) {
-        $name = $this->params[$param]['name'];
-        $ext = pathinfo($name, PATHINFO_EXTENSION);
-        $name = $this->random_string(48) . ".$ext";
-        $path = ($path == NULL) ? "uploads/$name" : $path;
-
-        if (move_uploaded_file($this->params[$param]['tmp_name'], $path)) {
-            return $path;
+        $name = (isset($this->params[$param]['name'])) ? $this->params[$param]['name'] : NULL;
+        if ($name == NULL) {
+            $data = $this->params[$param];
+            if (file_put_contents($path, $data)) {
+                return $path;
+            } else {
+                return FALSE;
+            }
         } else {
-            return FALSE;
+            $ext = pathinfo($name, PATHINFO_EXTENSION);
+            $name = $this->random_string(48) . ".$ext";
+            $path = ($path == NULL) ? "uploads/$name" : $path;
+
+            if (move_uploaded_file($this->params[$param]['tmp_name'], $path)) {
+                return $path;
+            } else {                
+                return FALSE;
+            }
         }
     }
 
@@ -262,6 +271,9 @@ class Ghost
             if ($option == $key['option']) {
 
                 if ($params != NULL) {
+                    if (is_string($params)) {
+                        $params = json_decode($params, TRUE);
+                    }
                     $rules = $key['rules'];
 
                     if (in_array($method, array('put', 'delete'))) {
@@ -281,7 +293,11 @@ class Ghost
                     //mantain the server cool and stop the
                     //client from being a lazy validator
                     foreach ($rules as $field => $type) {
-                        $wparam = $params[$field];
+                        $wparam = (isset($params[$field])) ? $params[$field] : NULL;
+                        if ($wparam == NULL) {
+                            $this->response(array($field => 'Is required'), 402);
+                            break;
+                        }
                         switch($type) {
                             case 'text':
                                 if (!is_string($wparam)) {
@@ -301,6 +317,11 @@ class Ghost
                             case 'file':
                                 if (!isset($_FILES)) {
                                     $this->response(array($field => 'Gotta select a file to update it'), 402);
+                                }
+                                break;
+                            case 'json':
+                                if (json_decode($wparam) === NULL) {
+                                    $this->response(array($field => 'Gotta be a JSON'), 402);
                                 }
                                 break;
                         }
@@ -340,6 +361,9 @@ class Ghost
             }
 
             $_METHOD['params'] = (isset($_METHOD['params'])) ? $_METHOD['params'] : NULL;
+            if (json_decode($_METHOD['params']) !== NULL) {
+                $_METHOD['params'] = json_decode($_METHOD['params'], TRUE);
+            }
             if (isset($_FILES)) {
                 foreach ($_FILES as $key => $val) { //without using $val it returns an array ($key) instead of keyname ($key) :|
                     if (isset($_METHOD['params'][$key]) == NULL) {
