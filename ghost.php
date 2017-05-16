@@ -115,7 +115,7 @@ class Ghost
 
             if (move_uploaded_file($this->params[$param]['tmp_name'], $path)) {
                 return $path;
-            } else {                
+            } else {
                 return FALSE;
             }
         }
@@ -320,7 +320,7 @@ class Ghost
                                 }
                                 break;
                             case 'json':
-                                if (json_decode($wparam) === NULL) {
+                                if (!is_string($wparam) || json_decode($wparam) === NULL) {
                                     $this->response(array($field => 'Gotta be a JSON'), 402);
                                 }
                                 break;
@@ -361,7 +361,7 @@ class Ghost
             }
 
             $_METHOD['params'] = (isset($_METHOD['params'])) ? $_METHOD['params'] : NULL;
-            if (json_decode($_METHOD['params']) !== NULL) {
+            if (is_string($_METHOD['params']) && json_decode($_METHOD['params']) !== NULL) {
                 $_METHOD['params'] = json_decode($_METHOD['params'], TRUE);
             }
             if (isset($_FILES)) {
