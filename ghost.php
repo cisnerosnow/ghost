@@ -10,6 +10,7 @@ class Ghost
     public $user = NULL;
     public $pass = NULL;
     public $db_name = NULL;
+	public $files = array();
 
     public function connect($host, $user, $pass, $db_name) { //set mysql connection
         $this->host = $host;
@@ -20,10 +21,6 @@ class Ghost
 
     public function get_connect() {
         return mysqli_connect($this->host, $this->user, $this->pass, $this->db_name);
-    }
-
-    public function hello() {
-        echo 'Hello from the other side';
     }
 
     public function sql($method, $option, $params) {
@@ -90,20 +87,68 @@ class Ghost
         return "DELETE FROM $option WHERE id='$params[id]' LIMIT 1";
     }
 
+    //http://stackoverflow.com/questions/19083175/generate-random-string-in-php-for-file-name
+    public function random_string($length) {
+        $key = '';
+        $keys = array_merge(range(0, 9), range('a', 'z'));
+
+        for ($i = 0; $i < $length; $i++) {
+            $key .= $keys[array_rand($keys)];
+        }
+
+        return $key;
+    }
+
+    public function save_file($param, $path = NULL) {
+        $name = $this->params[$param]['name'];
+        $ext = pathinfo($name, PATHINFO_EXTENSION);
+        $name = $this->random_string(48) . ".$ext";
+        $path = ($path == NULL) ? "uploads/$name" : $path;
+
+        if (move_uploaded_file($this->params[$param]['tmp_name'], $path)) {
+            return $path;
+        } else {
+            return FALSE;
+        }
+    }
+
     private function generate_callback_function($method) {
 
         switch($method) {
             case 'post':
-            case 'delete':
                 $function = function($gastly) {
+                    $params = $gastly->params;
+                    foreach ($params as $key => $value) {
+                        if (in_array($key, $gastly->files)) {
+                            $path = $gastly->save_file($key);
+                            if ($path != FALSE) {
+                                $params[$key] = $path;
+                            }
+                        }
+                    }
                     $code = 'success';
                     $msg = '';
-                    $sql = $gastly->sql($gastly->method, $gastly->option, $gastly->params);
+                    $sql = $gastly->sql($gastly->method, $gastly->option, $params);
                     $con = $gastly->get_connect();
-                    if (!mysqli_query($con, $sql)) {
+                    if (mysqli_query($con, $sql)) {
+                        $sql = $gastly->sql('get', $gastly->option, $params);
+                        $con = $gastly->get_connect();
+                        $res = mysqli_query($con, $sql);
+                        if ($res == TRUE && mysqli_num_rows($res) > 0) {
+                            $code = 'success';
+                            /*$msg = array();
+                            while ($row = mysqli_fetch_assoc($res)) {
+                                $msg[] = $row;
+                            }*/
+                        } else {
+                            $code = 'error';
+                            $msg = 'The id does not exist';
+                        }
+                    } else {
                         $code = 'error';
                         $msg = $sql;
                     }
+
                     return $gastly->response($msg, $code);
                 };
                 break;
@@ -123,17 +168,27 @@ class Ghost
                         $code = 'error';
                         $msg = $sql;
                     }
+
                     return $gastly->response($msg, $code);
                 };
                 break;
             case 'put':
                 $function = function($gastly) {
+                    $params = $gastly->params;
+                    foreach ($params as $key => $value) {
+                        if (in_array($key, $gastly->files)) {
+                            $path = $gastly->save_file($key);
+                            if ($path != FALSE) {
+                                $params[$key] = $path;
+                            }
+                        }
+                    }
                     $code = 'success';
-                    $sql = $gastly->sql('get', $gastly->option, $gastly->params);
+                    $sql = $gastly->sql('get', $gastly->option, $params);
                     $con = $gastly->get_connect();
                     $res = mysqli_query($con, $sql);
                     if ($res == TRUE && mysqli_num_rows($res) > 0) {
-                        $sql = $gastly->sql($gastly->method, $gastly->option, $gastly->params);
+                        $sql = $gastly->sql($gastly->method, $gastly->option, $params);
                         if (mysqli_query($con, $sql)) {
                             $code = 'success';
                             $msg = '';
@@ -144,6 +199,20 @@ class Ghost
                     } else {
                         $code = 'error';
                         $msg = 'The id does not exist';
+                    }
+                    return $gastly->response($msg, $code);
+                };
+                break;
+            case 'delete':
+                $function = function($gastly) {
+                    $params = $gastly->params;
+                    $code = 'success';
+                    $msg = '';
+                    $sql = $gastly->sql($gastly->method, $gastly->option, $params);
+                    $con = $gastly->get_connect();
+                    if (!mysqli_query($con, $sql)) {
+                        $code = 'error';
+                        $msg = $sql;
                     }
                     return $gastly->response($msg, $code);
                 };
@@ -214,6 +283,11 @@ class Ghost
                     foreach ($rules as $field => $type) {
                         $wparam = $params[$field];
                         switch($type) {
+                            case 'text':
+                                if (!is_string($wparam)) {
+                                    $this->response(array($field => 'Gotta be text'), 402);
+                                }
+                                break;
                             case 'int':
                                 if (!is_numeric($wparam)) {
                                     $this->response(array($field => 'Gotta be numeric'), 402);
@@ -222,6 +296,11 @@ class Ghost
                             case 'email':
                                 if (filter_var($wparam, FILTER_VALIDATE_EMAIL) === false) {
                                     $this->response(array($field => 'Gotta be a valid email'), 402);
+                                }
+                                break;
+                            case 'file':
+                                if (!isset($_FILES)) {
+                                    $this->response(array($field => 'Gotta select a file to update it'), 402);
                                 }
                                 break;
                         }
@@ -261,6 +340,15 @@ class Ghost
             }
 
             $_METHOD['params'] = (isset($_METHOD['params'])) ? $_METHOD['params'] : NULL;
+            if (isset($_FILES)) {
+                foreach ($_FILES as $key => $val) { //without using $val it returns an array ($key) instead of keyname ($key) :|
+                    if (isset($_METHOD['params'][$key]) == NULL) {
+                        $_METHOD['params'][$key] = $_FILES[$key];
+                        $this->files[] = $key;
+                    }
+                }
+            }
+
             if (isset($_METHOD['option'])) {
                 $this->method = $method;
                 $this->process($method, $_METHOD['option'], $_METHOD['params']);
