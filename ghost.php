@@ -55,7 +55,7 @@ class Ghost
         }
         $fields = trim($fields, ',');
         $values = trim($values, ',');
-        return "INSERT INTO $option ($fields) VALUES ($values)";
+        return utf8_decode("INSERT INTO $option ($fields) VALUES ($values)");
     }
 
     public function sql_get($option, $params) {
@@ -83,7 +83,7 @@ class Ghost
             }
         }
         $set = trim($set, ',');
-        return "UPDATE $option SET $set WHERE id='$params[id]' LIMIT 1";
+        return utf8_decode("UPDATE $option SET $set WHERE id='$params[id]' LIMIT 1");
     }
 
     public function sql_delete($option, $params) {
