@@ -321,7 +321,7 @@ class Ghost
                         }
                         switch($type) {
                             case 'text':
-                                if (!is_string($wparam)) {
+                                if (is_numeric($wparam) || !is_string($wparam)) {
                                     $this->response(array($field => 'Gotta be text'), 402);
                                 }
                                 break;
