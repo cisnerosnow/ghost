@@ -23,6 +23,10 @@ class Ghost
         return mysqli_connect($this->host, $this->user, $this->pass, $this->db_name);
     }
 
+    public function getConnect() {
+        return mysqli_connect($this->host, $this->user, $this->pass, $this->db_name);
+    }
+
     public function sql($method, $option, $params) {
         //return call_user_func("sql_$method");
         $sql = '';
@@ -292,12 +296,14 @@ class Ghost
                     $rules = $key['rules'];
 
                     if (in_array($method, array('put', 'delete'))) {
-                        if (!isset($params['id'])) {
+
+                        //Lo deje comentado porque no siempre  lleva un parametro id, hay veces que es tipo token o algo asi, puedo dejarlo para despues para declararlo como key
+                        /*if (!isset($params['id'])) {
                             $this->response('Falta el id', 400);
                         }
                         if (!isset($rules['id'])) {
                             $rules['id'] = 'int';
-                        }
+                        }*/
                     }
 
                     /*if (count($rules) != count($params)) {
@@ -365,7 +371,7 @@ class Ghost
     }
 
     function run() {
-
+        header('Access-Control-Allow-Origin: *');
         if (in_array($_SERVER['REQUEST_METHOD'], array('POST', 'GET', 'PUT', 'DELETE'))) {
 
             $method = strtolower($_SERVER['REQUEST_METHOD']);
