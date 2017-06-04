@@ -6,25 +6,19 @@ class Ghost
     public $params = NULL;
     public $method = NULL;
     public $option = NULL;
-    public $host = NULL;
-    public $user = NULL;
-    public $pass = NULL;
-    public $db_name = NULL;
 	public $files = array();
+    public $con = NULL;
 
     public function connect($host, $user, $pass, $db_name) { //set mysql connection
-        $this->host = $host;
-        $this->user = $user;
-        $this->pass = $pass;
-        $this->db_name = $db_name;
+        $this->con = mysqli_connect($host, $user, $pass, $db_name);
     }
 
     public function get_connect() {
-        return mysqli_connect($this->host, $this->user, $this->pass, $this->db_name);
+        return $this->con;
     }
 
     public function getConnect() {
-        return mysqli_connect($this->host, $this->user, $this->pass, $this->db_name);
+        return $this->con;
     }
 
     public function sql($method, $option, $params) {
@@ -283,7 +277,6 @@ class Ghost
     }
 
     protected function process($method, $option, $params = NULL) {
-
         $found = FALSE;
 
         foreach ($this->conf[$method] as $key) {
@@ -319,32 +312,48 @@ class Ghost
                             $this->response(array($field => 'Is required'), 402);
                             break;
                         }
-                        switch($type) {
-                            case 'text':
-                                if (is_numeric($wparam) || !is_string($wparam)) {
-                                    $this->response(array($field => 'Gotta be text'), 402);
-                                }
-                                break;
-                            case 'int':
-                                if (!is_numeric($wparam)) {
-                                    $this->response(array($field => 'Gotta be numeric'), 402);
-                                }
-                                break;
-                            case 'email':
-                                if (filter_var($wparam, FILTER_VALIDATE_EMAIL) === false) {
-                                    $this->response(array($field => 'Gotta be a valid email'), 402);
-                                }
-                                break;
-                            case 'file':
-                                if (!isset($_FILES)) {
-                                    $this->response(array($field => 'Gotta select a file to update it'), 402);
-                                }
-                                break;
-                            case 'json':
-                                if (!is_string($wparam) || json_decode($wparam) === NULL) {
-                                    $this->response(array($field => 'Gotta be a JSON'), 402);
-                                }
-                                break;
+
+                        if (is_array($type) || is_object($type)) {
+                            $paramValidators = $type;
+                            $validator = $this->validator($field, $wparam, $paramValidators);
+                            if ($validator !== TRUE) {
+                                $this->response($validator, 500);
+                            }
+                            break;
+                        } else if (is_callable($type)) {
+                            $gastly = (object) array($field => $wparam, 'con' => $this->con);
+                            if (call_user_func($type, $gastly) === FALSE) {
+                                $this->response(array($field => 'Is not valid'), 402);
+                            }
+                            break;
+                        } else {
+                            switch($type) {
+                                case 'text':
+                                    if (!is_string($wparam)) {
+                                        $this->response(array($field => 'Gotta be text'), 402);
+                                    }
+                                    break;
+                                case 'int':
+                                    if (!is_numeric($wparam)) {
+                                        $this->response(array($field => 'Gotta be numeric'), 402);
+                                    }
+                                    break;
+                                case 'email':
+                                    if (filter_var($wparam, FILTER_VALIDATE_EMAIL) === false) {
+                                        $this->response(array($field => 'Gotta be a valid email'), 402);
+                                    }
+                                    break;
+                                case 'file':
+                                    if (!isset($_FILES)) {
+                                        $this->response(array($field => 'Gotta select a file to update it'), 402);
+                                    }
+                                    break;
+                                case 'json':
+                                    if (!is_string($wparam) || json_decode($wparam) === NULL) {
+                                        $this->response(array($field => 'Gotta be a JSON'), 402);
+                                    }
+                                    break;
+                            }
                         }
                     }
                 }
@@ -368,6 +377,72 @@ class Ghost
         }
 
         exit;
+    }
+
+    function validator($field, $value, $rules) {
+        $valid = array();
+        foreach ($rules as $ruleKey => $ruleValue) {
+            switch($ruleKey) {
+                case 'type':
+                    $type = $ruleValue;
+                    if ($this->validateType($type, $value) === FALSE) {
+                        return "$field must be a $type";
+                    } else {
+                        $valid[] = TRUE;
+                    }
+                    break;
+                case 'length':
+                    if (strlen($value) !== (int)$ruleValue) {
+                        return "$field length is wrong";
+                    } else {
+                        $valid[] = TRUE;
+                    }
+                    break;
+                case 'function':
+                    $function = $ruleValue;
+                    if (is_callable($function)) {
+                        $gastly = (object) array($field => $value, 'con' => $this->con);
+                        if (call_user_func($function, $gastly) === FALSE) {
+                            return "$field is not valid";
+                        } else {
+                            $valid[] = TRUE;
+                        }
+                    } else {
+                        return "$field is not valid";
+                    }
+                    break;
+                default:
+                    return FALSE;
+            }
+        }
+
+        if (count($valid) == 3) {
+            return TRUE;
+        } else {
+            return FALSE;
+        }
+    }
+
+    function validateType($type, $value) {
+        switch($type) {
+            case 'text':
+                return is_string($value);
+                break;
+            case 'int':
+                return is_numeric($value);
+                break;
+            case 'email':
+                return (filter_var($value, FILTER_VALIDATE_EMAIL) === FALSE) ? FALSE : TRUE;
+                break;
+            case 'file':
+                return isset($_FILES);
+                break;
+            case 'json':
+                return (!is_string($value) || json_decode($value) === NULL) ? FALSE : TRUE;
+                break;
+        }
+
+        return FALSE;
     }
 
     function run() {
