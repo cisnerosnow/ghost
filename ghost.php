@@ -4,6 +4,7 @@ class Ghost
     protected $conf = array('post' => array(), 'get' => array(), 'put' => array(), 'delete' => array());
     protected $debug = FALSE;
     public $params = NULL;
+    public $param = NULL;
     public $method = NULL;
     public $option = NULL;
 	public $files = array();
@@ -42,17 +43,90 @@ class Ghost
     }
 
     //https://stackoverflow.com/questions/18910814/best-practice-to-generate-random-token-for-forgot-password
-    public function createToken($length = 16) {
+    public function createToken($length = 32) {
         return bin2hex(random_bytes($length));
     }
 
-    public function post($option, $params) {
-        $con = $this->get_connect();
+    public function post($table, $params) {
+        $con = $this->con;
         $sql = $this->sql_post($option, $params);
         if (mysqli_query($con, $sql)) {
             return TRUE;
         } else {
             return FALSE;
+        }
+    }
+
+    public function get($table, $fields, $where, $limit = 1) {
+        if (is_array($fields)) {
+            $fields_str = '';
+            foreach ($fields as $field) {
+                $fields_str .= "$field,";
+            }
+            $fields_str  = trim($fields_str, ',');
+
+            $wheres = '';
+            foreach ($where as $key => $value) {
+                $wheres .= "$key='$value' AND ";
+            }
+            $wheres = trim($wheres, ' AND ');
+
+            $con = $this->con;
+            $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
+            $sql = utf8_decode("SELECT $fields_str FROM $table WHERE $wheres $limit");
+            $res = mysqli_query($con, $sql);
+            if ($res == TRUE && mysqli_num_rows($res) > 0) {
+                $results = array();
+                while ($row = mysqli_fetch_assoc($res)) {
+                    $results[] = $row;
+                    //echo json_encode($myArray);
+                }
+                return $results;
+            } else {
+                return FALSE;
+            }
+        }
+    }
+
+    public function put($table, $params, $where, $limit = 1) {
+        if (is_array($params)) {
+            $sets = '';
+            foreach ($params as $key => $value) {
+                $sets .= "$key='$value',";
+            }
+            $sets = trim($sets, ',');
+
+            $wheres = '';
+            foreach ($where as $key => $value) {
+                $wheres .= "$key='$value' AND ";
+            }
+            $wheres = trim($wheres, ' AND ');
+
+            $con = $this->con;
+            $sql = utf8_decode("UPDATE $table SET $sets WHERE $wheres LIMIT $limit");
+            if (mysqli_query($con, $sql)) {
+                return TRUE;
+            } else {
+                return FALSE;
+            }
+        }
+    }
+
+    public function delete($table, $where, $limit = 1) {
+        if (is_array($params)) {
+            $wheres = '';
+            foreach ($where as $key => $value) {
+                $wheres .= "$key='$value' AND ";
+            }
+            $wheres = trim($wheres, ' AND ');
+
+            $con = $this->con;
+            $sql = utf8_decode("DELETE $table WHERE $wheres LIMIT $limit");
+            if (mysqli_query($con, $sql)) {
+                return TRUE;
+            } else {
+                return FALSE;
+            }
         }
     }
 
@@ -138,7 +212,7 @@ class Ghost
 
         switch($method) {
             case 'post':
-                $function = function($gastly) {
+                $function = function($gastly, $autoResponse = FALSE) {
                     $params = $gastly->params;
                     foreach ($params as $key => $value) {
                         if (in_array($key, $gastly->files)) {
@@ -171,11 +245,15 @@ class Ghost
                         $msg = $sql;
                     }
 
-                    return $gastly->response($msg, $code);
+                    if ($autoResponse == TRUE) {
+                        return $gastly->response($msg, $code);
+                    } else {
+                        return ($code == 'success') ? TRUE : FALSE;
+                    }
                 };
                 break;
             case 'get':
-                $function = function($gastly) {
+                $function = function($gastly, $autoResponse = FALSE) {
                     $code = 'success';
                     $sql = $gastly->sql($gastly->method, $gastly->option, $gastly->params);
                     $con = $gastly->get_connect();
@@ -191,11 +269,15 @@ class Ghost
                         $msg = $sql;
                     }
 
-                    return $gastly->response($msg, $code);
+                    if ($autoResponse == TRUE) {
+                        return $gastly->response($msg, $code);
+                    } else {
+                        return ($code == 'success') ? TRUE : FALSE;
+                    }
                 };
                 break;
             case 'put':
-                $function = function($gastly) {
+                $function = function($gastly, $autoResponse = FALSE) {
                     $params = $gastly->params;
                     foreach ($params as $key => $value) {
                         if (in_array($key, $gastly->files)) {
@@ -222,11 +304,16 @@ class Ghost
                         $code = 'error';
                         $msg = 'The id does not exist';
                     }
-                    return $gastly->response($msg, $code);
+
+                    if ($autoResponse == TRUE) {
+                        return $gastly->response($msg, $code);
+                    } else {
+                        return ($code == 'success') ? TRUE : FALSE;
+                    }
                 };
                 break;
             case 'delete':
-                $function = function($gastly) {
+                $function = function($gastly, $autoResponse = FALSE) {
                     $params = $gastly->params;
                     $code = 'success';
                     $msg = '';
@@ -236,7 +323,12 @@ class Ghost
                         $code = 'error';
                         $msg = $sql;
                     }
-                    return $gastly->response($msg, $code);
+
+                    if ($autoResponse == TRUE) {
+                        return $gastly->response($msg, $code);
+                    } else {
+                        return ($code == 'success') ? TRUE : FALSE;
+                    }
                 };
                 break;
         }
@@ -274,6 +366,13 @@ class Ghost
         header('Content-Type: application/json; charset=UTF-8');
         die(json_encode(array('message' => $msg, 'code' => $code)));
         exit;
+    }
+
+    function boolResponse($bool) {
+        if (is_bool($bool)) {
+            $code = ($bool == TRUE) ? 200 : 500;
+            $this->response('', $code);
+        }
     }
 
     protected function process($method, $option, $params = NULL) {
@@ -360,10 +459,11 @@ class Ghost
 
                 $this->option = $option;
                 $this->params = $params;
+                $this->param = (object) $params;
 
                 if ($key['function'] == NULL) {
                     $key['function'] = $this->generate_callback_function($method);
-                    $key['function']($this);
+                    $key['function']($this, TRUE);
                 } else {
                     if (is_string($key['function'])) {
                         call_user_func($key['function'], array($this));
@@ -445,7 +545,13 @@ class Ghost
         return FALSE;
     }
 
-    function run() {
+    public function runDefault($autoResponse = FALSE) {
+        $method = $this->method;
+        $defaultFunction = $this->generate_callback_function($method);
+        return $defaultFunction($this, $autoResponse);
+    }
+
+    public function run() {
         header('Access-Control-Allow-Origin: *');
         if (in_array($_SERVER['REQUEST_METHOD'], array('POST', 'GET', 'PUT', 'DELETE'))) {
 
