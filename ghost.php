@@ -121,7 +121,8 @@ class Ghost
             $wheres = trim($wheres, ' AND ');
 
             $con = $this->con;
-            $sql = utf8_decode("DELETE $table WHERE $wheres LIMIT $limit");
+            $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
+            $sql = utf8_decode("DELETE $table WHERE $wheres $limit");
             if (mysqli_query($con, $sql)) {
                 return TRUE;
             } else {
@@ -354,7 +355,7 @@ class Ghost
         }
     }
 
-    public function response($msg = '', $code = 0) {
+    public function response($msg = '', $code = 0, $typeText = FALSE) {
         if (!is_numeric($code)) {
             if ($code == 'success') {
                 $code = 200;
@@ -363,9 +364,18 @@ class Ghost
             }
         }
         header("HTTP/1.1 $code");
-        header('Content-Type: application/json; charset=UTF-8');
-        die(json_encode(array('message' => $msg, 'code' => $code)));
+        if ($typeText === FALSE) {
+            header('Content-Type: application/json; charset=UTF-8');
+            die(json_encode(array('message' => $msg, 'code' => $code)));
+        } else {
+            header('charset=UTF-8');
+            die($msg);
+        }
         exit;
+    }
+
+    public function responseText($msg = '', $code = 0) {
+        $this->response($msg, $code, TRUE);
     }
 
     function boolResponse($bool) {
