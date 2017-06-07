@@ -9,17 +9,27 @@ class Ghost
     public $option = NULL;
 	public $files = array();
     public $con = NULL;
+    public $host = NULL;
+    public $user = NULL;
+    public $pass = NULL;
+    public $db_name = NULL;
 
     public function connect($host, $user, $pass, $db_name) { //set mysql connection
+        $this->host = $host;
+        $this->user = $user;
+        $this->pass = $pass;
+        $this->db_name = $db_name;
         $this->con = mysqli_connect($host, $user, $pass, $db_name);
     }
 
     public function get_connect() {
-        return $this->con;
+        //return $this->con;
+        return mysqli_connect($this->host, $this->user, $this->pass, $this->db_name);
     }
 
     public function getConnect() {
-        return $this->con;
+        //return $this->con;
+        return $this->get_connect();
     }
 
     public function sql($method, $option, $params) {
@@ -48,7 +58,7 @@ class Ghost
     }
 
     public function post($table, $params) {
-        $con = $this->con;
+        $con = $this->getConnect();
         $sql = $this->sql_post($option, $params);
         if (mysqli_query($con, $sql)) {
             return TRUE;
@@ -71,7 +81,7 @@ class Ghost
             }
             $wheres = trim($wheres, ' AND ');
 
-            $con = $this->con;
+            $con = $this->getConnect();
             $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
             $sql = utf8_decode("SELECT $fields_str FROM $table WHERE $wheres $limit");
             $res = mysqli_query($con, $sql);
@@ -102,7 +112,7 @@ class Ghost
             }
             $wheres = trim($wheres, ' AND ');
 
-            $con = $this->con;
+            $con = $this->getConnect();
             $sql = utf8_decode("UPDATE $table SET $sets WHERE $wheres LIMIT $limit");
             if (mysqli_query($con, $sql)) {
                 return TRUE;
@@ -113,16 +123,16 @@ class Ghost
     }
 
     public function delete($table, $where, $limit = 1) {
-        if (is_array($params)) {
+        if (is_array($where)) {
             $wheres = '';
             foreach ($where as $key => $value) {
                 $wheres .= "$key='$value' AND ";
             }
             $wheres = trim($wheres, ' AND ');
 
-            $con = $this->con;
+            $con = $this->getConnect();
             $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
-            $sql = utf8_decode("DELETE $table WHERE $wheres $limit");
+            $sql = utf8_decode("DELETE FROM $table WHERE $wheres $limit");
             if (mysqli_query($con, $sql)) {
                 return TRUE;
             } else {
@@ -140,7 +150,9 @@ class Ghost
         }
         $fields = trim($fields, ',');
         $values = trim($values, ',');
-        return utf8_decode("INSERT INTO $option ($fields) VALUES ($values)");
+        $sql = "INSERT INTO $option($fields) VALUES($values)";
+        $sql = utf8_decode($sql);
+        return $sql;
     }
 
     public function sql_get($option, $params) {
@@ -430,7 +442,7 @@ class Ghost
                             }
                             break;
                         } else if (is_callable($type)) {
-                            $gastly = (object) array($field => $wparam, 'con' => $this->con);
+                            $gastly = (object) array($field => $wparam, 'con' => $this->getConnect());
                             if (call_user_func($type, $gastly) === FALSE) {
                                 $this->response(array($field => 'Is not valid'), 402);
                             }
@@ -511,7 +523,7 @@ class Ghost
                 case 'function':
                     $function = $ruleValue;
                     if (is_callable($function)) {
-                        $gastly = (object) array($field => $value, 'con' => $this->con);
+                        $gastly = (object) array($field => $value, 'con' => $this->getConnect());
                         if (call_user_func($function, $gastly) === FALSE) {
                             return "$field is not valid";
                         } else {
