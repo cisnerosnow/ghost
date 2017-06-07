@@ -441,7 +441,7 @@ class Ghost
                                 $this->response($validator, 500);
                             }
                             break;
-                        } else if (is_callable($type)) {
+                        } else if ($type != 'file' && is_callable($type)) { //check if type != 'file' because i got is_callable('file') == TRUE :|
                             $gastly = (object) array($field => $wparam, 'con' => $this->getConnect());
                             if (call_user_func($type, $gastly) === FALSE) {
                                 $this->response(array($field => 'Is not valid'), 402);
