@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+</head>
+<body>
+
+    Open your browser developer console to see  the results
+
+    <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+    <script type="text/javascript">
+        $(function() {
+
+            $.ajax({
+                url: "test.php",
+                type: "POST",
+                cache: false,
+                data: {
+                    option: "employee",
+                    params: {
+                        name: "Martin",
+                        lastname: "Cisneros Ñú",
+                    },
+                },
+                success: function(data) {
+
+                    console.info("POST employee success", data);
+
+                    $.ajax({
+                        url: "test.php",
+                        type: "GET",
+                        cache: false,
+                        data: {
+                            option: "employee",
+                            params: {
+                                name: "Martin",
+                            },
+                        },
+                        success: function(data) {
+                            console.info("GET employee success", data);
+                            var employeeId = data.message[0].id;
+
+                            $.ajax({
+                                url: "test.php",
+                                type: "PUT",
+                                cache: false,
+                                data: {
+                                    option: "employee",
+                                    params: {
+                                        name: "Martin",
+                                        lastname: "Cisneros Capistrán",
+                                        id: employeeId,
+                                    },
+                                },
+                                success: function(data) {
+                                    console.info("PUT employee success", data);                                    
+
+                                    $.ajax({
+                                        url: "test.php",
+                                        type: "DELETE",
+                                        cache: false,
+                                        data: {
+                                            option: "employee",
+                                            params: {
+                                                id: employeeId,
+                                            },
+                                        },
+                                        success: function(data) {
+                                            console.info("DELETE employee success", data);
+                                        },
+                                        error: function(a, b, c) {
+                                            console.error("DELETE employee error", a, b, c);
+                                        }
+                                    });
+                                },
+                                error: function(a, b, c) {
+                                    console.error("PUT employee error", a, b, c);
+                                }
+                            });
+                        },
+                        error: function(a, b, c) {
+                            console.error("GET employee error", a, b, c);
+                        }
+                    });
+                },
+                error: function(a, b, c) {
+                    console.error("POST employee error", a, b, c);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
