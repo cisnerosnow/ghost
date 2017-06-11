@@ -13,6 +13,7 @@ class Ghost
     public $user = NULL;
     public $pass = NULL;
     public $db_name = NULL;
+    public $key = NULL;
 
     public function connect($host, $user, $pass, $db_name) { //set mysql connection
         $this->host = $host;
@@ -57,90 +58,6 @@ class Ghost
         return bin2hex(random_bytes($length));
     }
 
-    public function post($table, $params) {
-        $con = $this->getConnect();
-        $sql = $this->sql_post($option, $params);
-        if (mysqli_query($con, $sql)) {
-            return TRUE;
-        } else {
-            return FALSE;
-        }
-    }
-
-    public function get($table, $fields, $where, $limit = 1) {
-        if (is_array($fields)) {
-            $fields_str = '';
-            foreach ($fields as $field) {
-                $fields_str .= "$field,";
-            }
-            $fields_str  = trim($fields_str, ',');
-
-            $wheres = '';
-            foreach ($where as $key => $value) {
-                $wheres .= "$key='$value' AND ";
-            }
-            $wheres = trim($wheres, ' AND ');
-
-            $con = $this->getConnect();
-            $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
-            $sql = utf8_decode("SELECT $fields_str FROM $table WHERE $wheres $limit");
-            $res = mysqli_query($con, $sql);
-            if ($res == TRUE && mysqli_num_rows($res) > 0) {
-                $results = array();
-                while ($row = mysqli_fetch_assoc($res)) {
-                    $results[] = $row;
-                    //echo json_encode($myArray);
-                }
-                return $results;
-            } else {
-                return FALSE;
-            }
-        }
-    }
-
-    public function put($table, $params, $where, $limit = 1) {
-        if (is_array($params)) {
-            $sets = '';
-            foreach ($params as $key => $value) {
-                $sets .= "$key='$value',";
-            }
-            $sets = trim($sets, ',');
-
-            $wheres = '';
-            foreach ($where as $key => $value) {
-                $wheres .= "$key='$value' AND ";
-            }
-            $wheres = trim($wheres, ' AND ');
-
-            $con = $this->getConnect();
-            $sql = utf8_decode("UPDATE $table SET $sets WHERE $wheres LIMIT $limit");
-            if (mysqli_query($con, $sql)) {
-                return TRUE;
-            } else {
-                return FALSE;
-            }
-        }
-    }
-
-    public function delete($table, $where, $limit = 1) {
-        if (is_array($where)) {
-            $wheres = '';
-            foreach ($where as $key => $value) {
-                $wheres .= "$key='$value' AND ";
-            }
-            $wheres = trim($wheres, ' AND ');
-
-            $con = $this->getConnect();
-            $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
-            $sql = utf8_decode("DELETE FROM $table WHERE $wheres $limit");
-            if (mysqli_query($con, $sql)) {
-                return TRUE;
-            } else {
-                return FALSE;
-            }
-        }
-    }
-
     public function sql_post($option, $params) {
         $fields = '';
         $values = '';
@@ -155,36 +72,135 @@ class Ghost
         return $sql;
     }
 
-    public function sql_get($option, $params) {
-        $fields = '';
-        $values = '';
-        foreach ($params as $field => $value) {
-            $fields .= "$field,";
-            $values .= "'$value',";
-        }
-        $fields = trim($fields, ',');
-        $values = trim($values, ',');
-        if (isset($params['id']) && is_numeric($params['id'])) {
-            $sql = "SELECT $fields FROM $option WHERE id='$params[id]' LIMIT 1";
+    public function post($table, $params) {
+        $con = $this->getConnect();
+        $sql = $this->sql_post($table, $params);
+        if (mysqli_query($con, $sql)) {
+            return TRUE;
         } else {
-            $sql = "SELECT $fields FROM $option";
+            return FALSE;
         }
-        return $sql;
     }
 
-    public function sql_put($option, $params) {
-        $set = '';
-        foreach ($params as $field => $value) {
-            if ($field != 'id') {
-                $set .= "$field='$value',";
+    public function sql_get($table, $fields = NULL, $where = NULL, $limit = 1) {
+
+        $fields_str = '*';
+        if (is_array($fields) && count($fields) > 0) {
+            $fields_str = '';
+            foreach ($fields as $field) {
+                $fields_str .= "$field,";
+            }
+            $fields_str  = trim($fields_str, ',');
+        }
+
+        $wheres = '';
+        if (is_array($where) && count($where) > 0) {
+            foreach ($where as $key => $value) {
+                $wheres .= "$key='$value' AND ";
+            }
+            $wheres = trim($wheres, ' AND ');
+            $wheres = "WHERE $wheres";
+        }
+
+        $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
+        return utf8_decode("SELECT $fields_str FROM $table $wheres $limit");
+    }
+
+    public function get($table, $fields, $where, $limit = 1) {
+        $sql = $this->sql_get($table, $fields, $where, $limit);
+        if ($sql !== FALSE) {
+            $con = $this->getConnect();
+            mysqli_query($con, "SET NAMES utf8");
+            $res = mysqli_query($con, $sql);
+            $arr = $this->queryToArray($res);
+            if (count($arr) > 0) {
+                return $arr;
+            } else {
+                return FALSE;
+            }
+
+            /*if ($res == TRUE && mysqli_num_rows($res) > 0) {
+                $results = array();
+                while ($row = mysqli_fetch_assoc($res)) {
+                    $results[] = $row;
+                }
+                return $results;
+            } else {
+                return FALSE;
+            }*/
+        }
+    }
+
+    public function queryToArray($res) {
+        $results = array();
+        if ($res == TRUE && mysqli_num_rows($res) > 0) {
+            while ($row = mysqli_fetch_assoc($res)) {
+                $results[] = $row;
             }
         }
-        $set = trim($set, ',');
-        return utf8_decode("UPDATE $option SET $set WHERE id='$params[id]' LIMIT 1");
+
+        return $results;
     }
 
-    public function sql_delete($option, $params) {
-        return "DELETE FROM $option WHERE id='$params[id]' LIMIT 1";
+    public function sql_put($table, $params, $where, $limit = 1) {
+        if (is_array($params)) {
+            $sets = '';
+            foreach ($params as $key => $value) {
+                $sets .= "$key='$value',";
+            }
+            $sets = trim($sets, ',');
+
+            $wheres = '';
+            foreach ($where as $key => $value) {
+                $wheres .= "$key='$value' AND ";
+            }
+            $wheres = trim($wheres, ' AND ');
+            return utf8_decode("UPDATE $table SET $sets WHERE $wheres LIMIT $limit");
+        } else {
+            return FALSE;
+        }
+    }
+
+    public function put($table, $params, $where, $limit = 1) {
+        $sql = $this->sql_put($table, $params, $where, $limit);
+        if ($sql !== FALSE) {
+            $con = $this->getConnect();
+            if (mysqli_query($con, $sql)) {
+                return TRUE;
+            } else {
+                return FALSE;
+            }
+        } else {
+            return FALSE;
+        }
+    }
+
+    public function delete($table, $where, $limit = 1) {
+        $sql = $this->sql_delete($table, $where, $limit);
+        if ($sql !== FALSE) {
+            $con = $this->getConnect();
+            if (mysqli_query($con, $sql)) {
+                return TRUE;
+            } else {
+                return FALSE;
+            }
+        } else {
+            return FALSE;
+        }
+    }
+
+    public function sql_delete($table, $where, $limit = 1) {
+        if (is_array($where)) {
+            $wheres = '';
+            foreach ($where as $key => $value) {
+                $wheres .= "$key='$value' AND ";
+            }
+            $wheres = trim($wheres, ' AND ');
+            $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
+            return utf8_decode("DELETE FROM $table WHERE $wheres $limit");
+        } else {
+            return FALSE;
+        }
     }
 
     //http://stackoverflow.com/questions/19083175/generate-random-string-in-php-for-file-name
@@ -219,128 +235,60 @@ class Ghost
                 return FALSE;
             }
         }
-    }
+    }    
 
-    private function generate_callback_function($method) {
-
+    public function generateCallbackFunction($method) {
         switch($method) {
             case 'post':
-                $function = function($gastly, $autoResponse = FALSE) {
-                    $params = $gastly->params;
-                    foreach ($params as $key => $value) {
-                        if (in_array($key, $gastly->files)) {
-                            $path = $gastly->save_file($key);
-                            if ($path != FALSE) {
-                                $params[$key] = $path;
-                            }
-                        }
-                    }
-                    $code = 'success';
-                    $msg = '';
-                    $sql = $gastly->sql($gastly->method, $gastly->option, $params);
-                    $con = $gastly->get_connect();
-                    if (mysqli_query($con, $sql)) {
-                        $sql = $gastly->sql('get', $gastly->option, $params);
-                        $con = $gastly->get_connect();
-                        $res = mysqli_query($con, $sql);
-                        if ($res == TRUE && mysqli_num_rows($res) > 0) {
-                            $code = 'success';
-                            /*$msg = array();
-                            while ($row = mysqli_fetch_assoc($res)) {
-                                $msg[] = $row;
-                            }*/
-                        } else {
-                            $code = 'error';
-                            $msg = 'The id does not exist';
-                        }
+                $function = function() {
+                    $table = $this->option;
+                    $params = $this->params;
+                    $res = $this->post($table, $params);
+                    if ($res === FALSE) {
+                        $this->response('', 500);
                     } else {
-                        $code = 'error';
-                        $msg = $sql;
-                    }
-
-                    if ($autoResponse == TRUE) {
-                        return $gastly->response($msg, $code);
-                    } else {
-                        return ($code == 'success') ? TRUE : FALSE;
+                        $this->response('', 200);
                     }
                 };
                 break;
             case 'get':
-                $function = function($gastly, $autoResponse = FALSE) {
-                    $code = 'success';
-                    $sql = $gastly->sql($gastly->method, $gastly->option, $gastly->params);
-                    $con = $gastly->get_connect();
-                    $res = mysqli_query($con, $sql);
-                    if ($res == TRUE && mysqli_num_rows($res) > 0) {
-                        $code = 'success';
-                        $msg = array();
-                        while ($row = mysqli_fetch_assoc($res)) {
-                            $msg[] = $row;
-                        }
+                $function = function() {
+                    $table = $this->option;
+                    $params = $this->params;
+                    $res = $this->get($table, NULL, $params);
+                    if ($res === FALSE) {
+                        $this->response($res, 500);
                     } else {
-                        $code = 'error';
-                        $msg = $sql;
-                    }
-
-                    if ($autoResponse == TRUE) {
-                        return $gastly->response($msg, $code);
-                    } else {
-                        return ($code == 'success') ? TRUE : FALSE;
+                        $this->response($res, 200);
                     }
                 };
                 break;
             case 'put':
-                $function = function($gastly, $autoResponse = FALSE) {
-                    $params = $gastly->params;
-                    foreach ($params as $key => $value) {
-                        if (in_array($key, $gastly->files)) {
-                            $path = $gastly->save_file($key);
-                            if ($path != FALSE) {
-                                $params[$key] = $path;
-                            }
-                        }
-                    }
-                    $code = 'success';
-                    $sql = $gastly->sql('get', $gastly->option, $params);
-                    $con = $gastly->get_connect();
-                    $res = mysqli_query($con, $sql);
-                    if ($res == TRUE && mysqli_num_rows($res) > 0) {
-                        $sql = $gastly->sql($gastly->method, $gastly->option, $params);
-                        if (mysqli_query($con, $sql)) {
-                            $code = 'success';
-                            $msg = '';
-                        } else {
-                            $code = 'error';
-                            $msg = $sql;
-                        }
+                $function = function() {
+                    $table = $this->option;
+                    $params = $this->params;
+                    $key = $this->key;
+                    $where = array($key => $params[$key]);
+                    unset($params[$key]);
+                    $res = $this->put($table, $params, $where);
+                    if ($res === FALSE) {
+                        $this->response('', 500);
                     } else {
-                        $code = 'error';
-                        $msg = 'The id does not exist';
-                    }
-
-                    if ($autoResponse == TRUE) {
-                        return $gastly->response($msg, $code);
-                    } else {
-                        return ($code == 'success') ? TRUE : FALSE;
+                        $this->response('', 200);
                     }
                 };
                 break;
             case 'delete':
-                $function = function($gastly, $autoResponse = FALSE) {
-                    $params = $gastly->params;
-                    $code = 'success';
-                    $msg = '';
-                    $sql = $gastly->sql($gastly->method, $gastly->option, $params);
-                    $con = $gastly->get_connect();
-                    if (!mysqli_query($con, $sql)) {
-                        $code = 'error';
-                        $msg = $sql;
-                    }
-
-                    if ($autoResponse == TRUE) {
-                        return $gastly->response($msg, $code);
+                $function = function() {
+                    $table = $this->option;
+                    $params = $this->params;
+                    $key = $this->key;
+                    $where = array($key => $params[$key]);
+                    $res = $this->delete($table, $where);
+                    if ($res === FALSE) {
+                        $this->response('', 500);
                     } else {
-                        return ($code == 'success') ? TRUE : FALSE;
+                        $this->response('', 200);
                     }
                 };
                 break;
@@ -359,7 +307,7 @@ class Ghost
                 foreach ($methods as $method) {
                     if ($w_function == NULL) {
                         $this->method = $method;
-                        $function = $this->generate_callback_function($method);
+                        $function = $this->generateCallbackFunction($method);
                     }
                     $this->conf[$method][] = array('option' => $option, 'rules' => $rules, 'function' => $function);
                 }
@@ -399,10 +347,10 @@ class Ghost
 
     protected function process($method, $option, $params = NULL) {
         $found = FALSE;
-
+        $optionFound = FALSE;
         foreach ($this->conf[$method] as $key) {
             if ($option == $key['option']) {
-
+                $optionFound = TRUE;
                 if ($params != NULL) {
                     if (is_string($params)) {
                         $params = json_decode($params, TRUE);
@@ -441,7 +389,7 @@ class Ghost
                                 $this->response($validator, 500);
                             }
                             break;
-                        } else if ($type != 'file' && is_callable($type)) { //check if type != 'file' because i got is_callable('file') == TRUE :|
+                        } else if ($type != 'key' && $type != 'file' && is_callable($type)) { //check if type != 'file' because i got is_callable('file') == TRUE :|
                             $gastly = (object) array($field => $wparam, 'con' => $this->getConnect());
                             if (call_user_func($type, $gastly) === FALSE) {
                                 $this->response(array($field => 'Is not valid'), 402);
@@ -474,6 +422,13 @@ class Ghost
                                         $this->response(array($field => 'Gotta be a JSON'), 402);
                                     }
                                     break;
+                                case 'key':
+                                    if (is_numeric($wparam)) {
+                                        $this->key = $field;
+                                    } else {
+                                        $this->response(array($field => 'Gotta be numeric'), 402);
+                                    }
+                                    break;
                             }
                         }
                     }
@@ -484,7 +439,7 @@ class Ghost
                 $this->param = (object) $params;
 
                 if ($key['function'] == NULL) {
-                    $key['function'] = $this->generate_callback_function($method);
+                    $key['function'] = $this->generateCallbackFunction($method); //$this->generate_callback_function($method);
                     $key['function']($this, TRUE);
                 } else {
                     if (is_string($key['function'])) {
@@ -498,6 +453,9 @@ class Ghost
             }
         }
 
+        if ($optionFound == FALSE) {
+            $this->response('', 404); //There is no option that match
+        }
         exit;
     }
 
@@ -569,7 +527,7 @@ class Ghost
 
     public function runDefault($autoResponse = FALSE) {
         $method = $this->method;
-        $defaultFunction = $this->generate_callback_function($method);
+        $defaultFunction = $this->generateCallbackFunction($method);
         return $defaultFunction($this, $autoResponse);
     }
 
