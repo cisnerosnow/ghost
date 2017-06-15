@@ -55,7 +55,11 @@ class Ghost
 
     //https://stackoverflow.com/questions/18910814/best-practice-to-generate-random-token-for-forgot-password
     public function createToken($length = 32) {
-        return bin2hex(random_bytes($length));
+        if (function_exists('bin2hex') && function_exists('random_bytes')) {
+            return bin2hex(random_bytes($length));
+        } else {
+            return $this->random_string($length);
+        }
     }
 
     public function sql_post($option, $params) {
@@ -235,7 +239,7 @@ class Ghost
                 return FALSE;
             }
         }
-    }    
+    }
 
     public function generateCallbackFunction($method) {
         switch($method) {
