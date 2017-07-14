@@ -166,16 +166,30 @@ class Ghost
     }
 
     public function put($table, $params, $where, $limit = 1) {
-        $sql = $this->sql_put($table, $params, $where, $limit);
-        if ($sql !== FALSE) {
-            $con = $this->getConnect();
-            if (mysqli_query($con, $sql)) {
-                return TRUE;
-            } else {
-                return FALSE;
-            }
-        } else {
+
+        if (! is_array($params)) {
             return FALSE;
+        } else {
+            $paramsArr = array();
+            foreach ($params as $key => $value) {
+                $paramsArr[] = $key;
+            }
+            $res = $this->get($table, $paramsArr, $where, $limit);
+            if ($res === FALSE) {
+                return FALSE;
+            } else {
+                $sql = $this->sql_put($table, $params, $where, $limit);
+                if ($sql !== FALSE) {
+                    $con = $this->getConnect();
+                    if (mysqli_query($con, $sql)) {
+                        return TRUE;
+                    } else {
+                        return FALSE;
+                    }
+                } else {
+                    return FALSE;
+                }
+            }
         }
     }
 
