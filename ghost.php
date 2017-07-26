@@ -86,7 +86,7 @@ class Ghost
         }
     }
 
-    public function sql_get($table, $fields = NULL, $where = NULL, $limit = 1) {
+    public function sql_get($table, $fields = NULL, $where = NULL, $limit = 1, $orderBy = NULL) {
 
         $fields_str = '*';
         if (is_array($fields) && count($fields) > 0) {
@@ -107,11 +107,12 @@ class Ghost
         }
 
         $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
-        return utf8_decode("SELECT $fields_str FROM $table $wheres $limit");
+        $orderBy = ($orderBy == NULL) ? '' : "ORDER BY $orderBy";
+        return utf8_decode("SELECT $fields_str FROM $table $wheres $orderBy $limit");
     }
 
-    public function get($table, $fields, $where, $limit = 1) {
-        $sql = $this->sql_get($table, $fields, $where, $limit);
+    public function get($table, $fields, $where, $limit = 1, $orderBy = NULL) {
+        $sql = $this->sql_get($table, $fields, $where, $limit, $orderBy);
         if ($sql !== FALSE) {
             $con = $this->getConnect();
             mysqli_query($con, "SET NAMES utf8");
