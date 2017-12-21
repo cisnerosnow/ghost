@@ -53,6 +53,15 @@ class Ghost
         return $sql;
     }
 
+    public function query($sql = '') {
+        if ($sql != '') {
+            $con = $this->getConnect();
+            return mysqli_query($con, $sql);
+        } else {
+            return FALSE;
+        }
+    }
+
     //https://stackoverflow.com/questions/18910814/best-practice-to-generate-random-token-for-forgot-password
     public function createToken($length = 32) {
         if (function_exists('bin2hex') && function_exists('random_bytes')) {
@@ -107,11 +116,20 @@ class Ghost
         }
 
         $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
-        $orderBy = ($orderBy == NULL) ? '' : "ORDER BY $orderBy";
+        if (is_array($orderBy)) {
+            $sql = 'ORDER BY ';
+            foreach ($orderBy as $key => $value) {
+                $sql .= "$key $value, ";
+            }
+            $sql = trim($sql, ',');
+            $orderBy = $sql;
+        } else {
+            $orderBy = ($orderBy == NULL) ? '' : "ORDER BY $orderBy";
+        }
         return utf8_decode("SELECT $fields_str FROM $table $wheres $orderBy $limit");
     }
 
-    public function get($table, $fields, $where, $limit = 1, $orderBy = NULL) {
+    public function get($table, $fields, $where = NULL, $limit = 1, $orderBy = NULL) {
         $sql = $this->sql_get($table, $fields, $where, $limit, $orderBy);
         if ($sql !== FALSE) {
             $con = $this->getConnect();
@@ -316,8 +334,10 @@ class Ghost
         return $function;
     }
 
+    //$rules are not required
+    //$function is not required
     public function service($method = NULL, $option = NULL, $rules = NULL, $function = NULL) {
-        if (isset($method, $option, $rules)) { //, $function)) {
+        if (isset($method, $option)) {
             $methods = array('post', 'get', 'put', 'delete');
             if (in_array($method, $methods)) {
                 $this->conf[$method][] = array('option' => $option, 'rules' => $rules, 'function' => $function);
@@ -351,6 +371,11 @@ class Ghost
             die($msg);
         }
         exit;
+    }
+
+    public function jsonEncode($arr) {
+        header('Content-Type: application/json; charset=UTF-8');
+        die(json_encode($arr));
     }
 
     public function responseText($msg = '', $code = 0) {
@@ -454,7 +479,7 @@ class Ghost
                 }
 
                 $this->option = $option;
-                $this->params = $params;
+                $this->params = $params;                
                 $this->param = (object) $params;
 
                 if ($key['function'] == NULL) {
