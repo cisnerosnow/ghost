@@ -14,18 +14,79 @@ class Ghost
     public $pass = NULL;
     public $db_name = NULL;
     public $key = NULL;
+    protected $db_type = 'mysql';
 
-    public function connect($host, $user, $pass, $db_name) { //set mysql connection
+    public function connect($host, $user, $pass, $db_name) {
         $this->host = $host;
         $this->user = $user;
         $this->pass = $pass;
-        $this->db_name = $db_name;
-        $this->con = mysqli_connect($host, $user, $pass, $db_name);
+        $this->db_name = $db_name;        
+        $this->con = $this->m_connect($host, $user, $pass, $db_name);        
+    }
+
+    public function set_db_type($db_type) {
+        if ($db_type == 'mysql' || $db_type == 'mysqli') {
+            $db_type = 'mysql';
+        } else {
+            $db_type = 'mssql';
+        }
+        $this->db_type = $db_type;
+    }
+
+    private function m_connect($host, $user, $pass, $db_name) {
+        if ($this->db_type == 'mysql') {            
+            return mysqli_connect($host, $user, $pass, $db_name);
+        } else {
+            // Crear una conexión a MSSQL
+            $link = mssql_connect($host, $user, $pass);
+
+            // Seleccionar la base de datos 'php'
+            mssql_select_db($db_name, $link);
+
+            return $link;
+        }
+    }
+
+    private function m_query($con, $query) {
+        if ($this->db_type == 'mysql') {
+            return mysqli_query($con, $query);
+        } else {
+            return mssql_query($query, $con);
+        }
+    }
+
+    private function m_num_rows($res) {
+        if ($this->db_type == 'mysql') {
+            return mysqli_num_rows($res);
+        } else {
+            return mssql_num_rows($res);
+        }
+    }
+
+    private function m_fetch_assoc($res) {
+        if ($this->db_type == 'mysql') {
+            return mysqli_fetch_assoc($res);
+        } else {
+            return mssql_fetch_assoc($res);
+        }
+    }
+    
+    public function m_fetch_array($res) {
+        if ($this->db_type == 'mysql') {
+            return mysqli_fetch_array($res);
+        } else {
+            return mssql_fetch_array($res);
+        }
     }
 
     public function get_connect() {
-        //return $this->con;
-        return mysqli_connect($this->host, $this->user, $this->pass, $this->db_name);
+        $this->host = $host;
+        $this->user = $user;
+        $this->pass = $pass;
+        $this->db_name = $db_name;    
+        $x = $this->m_connect($host, $user, $pass, $db_name);
+        var_dump($x);
+        exit;
     }
 
     public function getConnect() {
@@ -55,8 +116,8 @@ class Ghost
 
     public function query($sql = '') {
         if ($sql != '') {
-            $con = $this->getConnect();
-            return mysqli_query($con, $sql);
+            $con = $this->con; //$this->getConnect();
+            return $this->m_query($con, $sql);
         } else {
             return FALSE;
         }
@@ -86,9 +147,9 @@ class Ghost
     }
 
     public function post($table, $params) {
-        $con = $this->getConnect();
+        $con = $this->con; //$this->getConnect();
         $sql = $this->sql_post($table, $params);
-        if (mysqli_query($con, $sql)) {
+        if ($this->m_query($con, $sql)) {
             return TRUE;
         } else {
             return FALSE;
@@ -115,7 +176,11 @@ class Ghost
             $wheres = "WHERE $wheres";
         }
 
-        $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
+        if ($this->db_type == 'mysql') {
+            $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
+        } else {
+            $limit = ($limit == FALSE) ? '' : "TOP $limit";
+        }
         if (is_array($orderBy)) {
             $sql = 'ORDER BY ';
             foreach ($orderBy as $key => $value) {
@@ -126,38 +191,36 @@ class Ghost
         } else {
             $orderBy = ($orderBy == NULL) ? '' : "ORDER BY $orderBy";
         }
-        return utf8_decode("SELECT $fields_str FROM $table $wheres $orderBy $limit");
+        if ($this->db_type == 'mysql') {
+            return utf8_decode("SELECT $fields_str FROM $table $wheres $orderBy $limit");
+        } else {
+            return utf8_decode("SELECT $limit $fields_str FROM $table $wheres $orderBy");
+        }
     }
 
     public function get($table, $fields, $where = NULL, $limit = 1, $orderBy = NULL) {
         $sql = $this->sql_get($table, $fields, $where, $limit, $orderBy);
         if ($sql !== FALSE) {
-            $con = $this->getConnect();
-            mysqli_query($con, "SET NAMES utf8");
-            $res = mysqli_query($con, $sql);
+            $con = $this->con; //$this->getConnect();
+
+            //Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
+            if ($this->db_type == 'myqsli') {
+                $this->m_query($con, "SET NAMES utf8");
+            }            
+            $res = $this->m_query($con, $sql);
             $arr = $this->queryToArray($res);
             if (count($arr) > 0) {
                 return $arr;
             } else {
                 return FALSE;
-            }
-
-            /*if ($res == TRUE && mysqli_num_rows($res) > 0) {
-                $results = array();
-                while ($row = mysqli_fetch_assoc($res)) {
-                    $results[] = $row;
-                }
-                return $results;
-            } else {
-                return FALSE;
-            }*/
+            }            
         }
     }
 
     public function queryToArray($res) {
         $results = array();
-        if ($res == TRUE && mysqli_num_rows($res) > 0) {
-            while ($row = mysqli_fetch_assoc($res)) {
+        if ($res == TRUE && $this->m_num_rows($res) > 0) {
+            while ($row = $this->m_fetch_assoc($res)) {
                 $results[] = $row;
             }
         }
@@ -178,7 +241,11 @@ class Ghost
                 $wheres .= "$key='$value' AND ";
             }
             $wheres = trim($wheres, ' AND ');
-            return utf8_decode("UPDATE $table SET $sets WHERE $wheres LIMIT $limit");
+            if ($this->db_type == 'mysql') {
+                return utf8_decode("UPDATE $table SET $sets WHERE $wheres LIMIT $limit");
+            } else {
+                return utf8_decode("UPDATE TOP($limit) $table SET $sets WHERE $wheres");
+            }
         } else {
             return FALSE;
         }
@@ -199,8 +266,8 @@ class Ghost
             } else {
                 $sql = $this->sql_put($table, $params, $where, $limit);
                 if ($sql !== FALSE) {
-                    $con = $this->getConnect();
-                    if (mysqli_query($con, $sql)) {
+                    $con = $this->con; //$this->getConnect();
+                    if ($this->m_query($con, $sql)) {
                         return TRUE;
                     } else {
                         return FALSE;
@@ -215,8 +282,8 @@ class Ghost
     public function delete($table, $where, $limit = 1) {
         $sql = $this->sql_delete($table, $where, $limit);
         if ($sql !== FALSE) {
-            $con = $this->getConnect();
-            if (mysqli_query($con, $sql)) {
+            $con = $this->con; //$this->getConnect();
+            if ($this->m_query($con, $sql)) {
                 return TRUE;
             } else {
                 return FALSE;
@@ -233,8 +300,14 @@ class Ghost
                 $wheres .= "$key='$value' AND ";
             }
             $wheres = trim($wheres, ' AND ');
-            $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
-            return utf8_decode("DELETE FROM $table WHERE $wheres $limit");
+
+            if ($this->db_type == 'mysql') {
+                $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
+                return utf8_decode("DELETE FROM $table WHERE $wheres $limit");
+            } else {
+                $limit = ($limit == FALSE) ? '' : "TOP $limit";
+                return utf8_decode("DELETE $limit FROM $table WHERE $wheres");
+            }
         } else {
             return FALSE;
         }
@@ -354,13 +427,17 @@ class Ghost
         }
     }
 
-    public function response($msg = '', $code = 0, $typeText = FALSE) {
+    public function response($msg = '', $code = 200, $typeText = FALSE) {
         if (!is_numeric($code)) {
             if ($code == 'success') {
                 $code = 200;
             } else {
                 $code = 500;
             }
+        }
+        if ($msg === FALSE) {
+            $code = 500;
+            $msg = '';
         }
         header("HTTP/1.1 $code");
         if ($typeText === FALSE) {
@@ -434,7 +511,7 @@ class Ghost
                             }
                             break;
                         } else if ($type != 'key' && $type != 'file' && is_callable($type)) { //check if type != 'file' because i got is_callable('file') == TRUE :|
-                            $gastly = (object) array($field => $wparam, 'con' => $this->getConnect());
+                            $gastly = (object) array($field => $wparam, 'con' => $this->con); //$this->getConnect());
                             if (call_user_func($type, $gastly) === FALSE) {
                                 $this->response(array($field => 'Is not valid'), 402);
                             }
@@ -525,7 +602,7 @@ class Ghost
                 case 'function':
                     $function = $ruleValue;
                     if (is_callable($function)) {
-                        $gastly = (object) array($field => $value, 'con' => $this->getConnect());
+                        $gastly = (object) array($field => $value, 'con' => $this->con); //$this->getConnect());
                         if (call_user_func($function, $gastly) === FALSE) {
                             return "$field is not valid";
                         } else {
