@@ -543,6 +543,11 @@ class Ghost
                                         $this->response(array($field => 'Gotta be a JSON'), 402);
                                     }
                                     break;
+                                case 'array':
+                                    if (is_array($wparam) === FALSE) {
+                                        $this->response(array($field => 'Gotta be an array'), 402);
+                                    }
+                                    break;
                                 case 'key':
                                     if (is_numeric($wparam)) {
                                         $this->key = $field;
