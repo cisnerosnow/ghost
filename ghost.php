@@ -25,11 +25,6 @@ class Ghost
     }
 
     public function set_db_type($db_type) {
-        if ($db_type == 'mysql' || $db_type == 'mysqli') {
-            $db_type = 'mysql';
-        } else {
-            $db_type = 'mssql';
-        }
         $this->db_type = $db_type;
     }
 
@@ -46,16 +41,15 @@ class Ghost
 
             return $link;
         } else if ($dbType == 'oracle') {
-
-            //its like db_name is equal to user or something like...
-            //return oci_connect('APPNOMINA', 'N0m!naPRD18', '10.65.0.29/ORCL', 'AL32UTF8'); 
+            //db_name is equal to user
             return oci_connect($db_name, $pass, $host, 'AL32UTF8');            
         }
     }
 
     public function m_query($query) {
         $con = $this->con;
-        if ($this->db_type == 'mysql') {
+        $dbType = $this->db_type;
+        if ($dbType == 'mysql') {
             return mysqli_query($con, $query);
         } else if ($dbType == 'mssql') {
             return mssql_query($query, $con);
@@ -64,7 +58,11 @@ class Ghost
             if (oci_execute($stid)) {
                 return $stid;
             } else {
-                var_dump($stid); //not the best way :|
+                //not the best way :|
+                //var_dump($stid);
+                $e = oci_error($stid);  // For oci_execute errors pass the statement handle
+                var_dump($e);
+                exit;
             }
         }
     }
@@ -217,7 +215,7 @@ class Ghost
         } else {
             $orderBy = ($orderBy == NULL) ? '' : "ORDER BY $orderBy";
         }
-        if ($this->db_type == 'mysql') {
+        if ($this->dbType == 'mysql') {
             return utf8_decode("SELECT $fields_str FROM $table $wheres $orderBy $limit");
         } else {
             return utf8_decode("SELECT $limit $fields_str FROM $table $wheres $orderBy");
@@ -226,13 +224,12 @@ class Ghost
 
     public function get($table, $fields, $where = NULL, $limit = 1, $orderBy = NULL) {
         $sql = $this->sql_get($table, $fields, $where, $limit, $orderBy);
-        if ($sql !== FALSE) {
-            $con = $this->con; //$this->getConnect();
+        if ($sql !== FALSE) {            
 
             //Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
-            if ($this->db_type == 'myqsli') {
+            if ($this->db_type == 'myqsl') {
                 $this->m_query("SET NAMES utf8");
-            }            
+            }
             $res = $this->m_query($sql);
             $arr = $this->queryToArray($res);
             if (count($arr) > 0) {
@@ -264,21 +261,40 @@ class Ghost
 
     public function sql_put($table, $params, $where, $limit = 1) {
         if (is_array($params)) {
+            $dbType = $this->db_type;
             $sets = '';
             foreach ($params as $key => $value) {
-                $sets .= "$key='$value',";
+                if ($dbType == 'oracle') {
+                    if (is_numeric($value)) {
+                        $sets .= "$key=$value,";
+                    } else {
+                        $sets .= "$key='$value',";
+                    }
+                } else {
+                    $sets .= "$key='$value',";
+                }
             }
             $sets = trim($sets, ',');
 
             $wheres = '';
             foreach ($where as $key => $value) {
-                $wheres .= "$key='$value' AND ";
+                if ($dbType == 'oracle') {
+                    if (is_numeric($value)) {
+                        $wheres .= "$key=$value AND ";
+                    } else { 
+                        $wheres .= "$key='$value' AND ";
+                    }
+                } else { 
+                    $wheres .= "$key='$value' AND ";
+                }                
             }
-            $wheres = trim($wheres, ' AND ');
-            if ($this->db_type == 'mysql') {
+            $wheres = trim($wheres, ' AND ');            
+            if ($dbType == 'mysql') {
                 return utf8_decode("UPDATE $table SET $sets WHERE $wheres LIMIT $limit");
-            } else {
+            } else if ($dbType == 'mssql') {
                 return utf8_decode("UPDATE TOP($limit) $table SET $sets WHERE $wheres");
+            } else if ($dbType == 'oracle') {
+                return utf8_decode("UPDATE $table SET $sets WHERE $wheres");
             }
         } else {
             return FALSE;
@@ -295,10 +311,10 @@ class Ghost
                 $paramsArr[] = $key;
             }
             $res = $this->get($table, $paramsArr, $where, $limit);
-            if ($res === FALSE) {
+            if ($res === FALSE) {                
                 return FALSE;
-            } else {
-                $sql = $this->sql_put($table, $params, $where, $limit);
+            } else {                
+                $sql = $this->sql_put($table, $params, $where, $limit);                
                 if ($sql !== FALSE) {                    
                     if ($this->m_query($sql)) {
                         return TRUE;
