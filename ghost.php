@@ -34,9 +34,10 @@ class Ghost
     }
 
     private function m_connect($host, $user, $pass, $db_name) {
-        if ($this->db_type == 'mysql') {            
+        $dbType = $this->db_type;
+        if ($dbType == 'mysql') {            
             return mysqli_connect($host, $user, $pass, $db_name);
-        } else {
+        } else if ($dbType == 'mssql') {
             // Crear una conexión a MSSQL
             $link = mssql_connect($host, $user, $pass);
 
@@ -44,38 +45,64 @@ class Ghost
             mssql_select_db($db_name, $link);
 
             return $link;
+        } else if ($dbType == 'oracle') {
+
+            //its like db_name is equal to user or something like...
+            //return oci_connect('APPNOMINA', 'N0m!naPRD18', '10.65.0.29/ORCL', 'AL32UTF8'); 
+            return oci_connect($db_name, $pass, $host, 'AL32UTF8');            
         }
     }
 
-    private function m_query($con, $query) {
+    public function m_query($query) {
+        $con = $this->con;
         if ($this->db_type == 'mysql') {
             return mysqli_query($con, $query);
-        } else {
+        } else if ($dbType == 'mssql') {
             return mssql_query($query, $con);
+        } else if ($dbType == 'oracle') {            
+            $stid = oci_parse($con, $query);
+            if (oci_execute($stid)) {
+                return $stid;
+            } else {
+                var_dump($stid); //not the best way :|
+            }
         }
     }
 
     private function m_num_rows($res) {
-        if ($this->db_type == 'mysql') {
+        $dbType = $this->db_type;
+        if ($dbType == 'mysql') {
             return mysqli_num_rows($res);
-        } else {
+        } else if ($dbType == 'mssql') {
             return mssql_num_rows($res);
+        } else if ($dbType == 'oracle') {
+            if ($res === FALSE) {
+                return 0;
+            } else {
+                return 1;
+            }
         }
     }
 
     private function m_fetch_assoc($res) {
-        if ($this->db_type == 'mysql') {
+        $dbType = $this->db_type;
+        if ($dbType == 'mysql') {
             return mysqli_fetch_assoc($res);
-        } else {
+        } else if ($dbType == 'mssql') {
             return mssql_fetch_assoc($res);
+        } else if ($dbType == 'oracle') {
+            return oci_fetch_assoc($res);
         }
     }
     
     public function m_fetch_array($res) {
-        if ($this->db_type == 'mysql') {
+        $dbType = $this->db_type;
+        if ($dbType == 'mysql') {
             return mysqli_fetch_array($res);
-        } else {
+        } else if ($dbType == 'mssql') {
             return mssql_fetch_array($res);
+        } else if ($dbType == 'oracle') {
+            return oci_fetch_array($res, OCI_ASSOC+OCI_RETURN_NULLS);
         }
     }
 
@@ -84,9 +111,7 @@ class Ghost
         $this->user = $user;
         $this->pass = $pass;
         $this->db_name = $db_name;    
-        $x = $this->m_connect($host, $user, $pass, $db_name);
-        var_dump($x);
-        exit;
+        return $this->m_connect($host, $user, $pass, $db_name);        
     }
 
     public function getConnect() {
@@ -116,8 +141,7 @@ class Ghost
 
     public function query($sql = '') {
         if ($sql != '') {
-            $con = $this->con; //$this->getConnect();
-            return $this->m_query($con, $sql);
+            return $this->m_query($sql);
         } else {
             return FALSE;
         }
@@ -146,10 +170,9 @@ class Ghost
         return $sql;
     }
 
-    public function post($table, $params) {
-        $con = $this->con; //$this->getConnect();
+    public function post($table, $params) {        
         $sql = $this->sql_post($table, $params);
-        if ($this->m_query($con, $sql)) {
+        if ($this->m_query($sql)) {
             return TRUE;
         } else {
             return FALSE;
@@ -176,10 +199,13 @@ class Ghost
             $wheres = "WHERE $wheres";
         }
 
-        if ($this->db_type == 'mysql') {
+        $dbType = $this->db_type;
+        if ($dbType == 'mysql') {
             $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
-        } else {
+        } else if ($dbType == 'mssql') {
             $limit = ($limit == FALSE) ? '' : "TOP $limit";
+        } else if ($dbType == 'oracle') {
+            $limit = ($limit == FALSE) ? '' : ''; //i'll apply something for oracle later
         }
         if (is_array($orderBy)) {
             $sql = 'ORDER BY ';
@@ -205,9 +231,9 @@ class Ghost
 
             //Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
             if ($this->db_type == 'myqsli') {
-                $this->m_query($con, "SET NAMES utf8");
+                $this->m_query("SET NAMES utf8");
             }            
-            $res = $this->m_query($con, $sql);
+            $res = $this->m_query($sql);
             $arr = $this->queryToArray($res);
             if (count($arr) > 0) {
                 return $arr;
@@ -219,11 +245,19 @@ class Ghost
 
     public function queryToArray($res) {
         $results = array();
-        if ($res == TRUE && $this->m_num_rows($res) > 0) {
-            while ($row = $this->m_fetch_assoc($res)) {
-                $results[] = $row;
+        if ($this->db_type == 'oracle') {
+            if ($this->m_num_rows($res) > 0) {
+                while ($row = $this->m_fetch_assoc($res)) {
+                    $results[] = $row;
+                }
             }
-        }
+        } else {
+            if ($res == TRUE && $this->m_num_rows($res) > 0) {
+                while ($row = $this->m_fetch_assoc($res)) {
+                    $results[] = $row;
+                }
+            }
+        }        
 
         return $results;
     }
@@ -265,9 +299,8 @@ class Ghost
                 return FALSE;
             } else {
                 $sql = $this->sql_put($table, $params, $where, $limit);
-                if ($sql !== FALSE) {
-                    $con = $this->con; //$this->getConnect();
-                    if ($this->m_query($con, $sql)) {
+                if ($sql !== FALSE) {                    
+                    if ($this->m_query($sql)) {
                         return TRUE;
                     } else {
                         return FALSE;
@@ -281,9 +314,8 @@ class Ghost
 
     public function delete($table, $where, $limit = 1) {
         $sql = $this->sql_delete($table, $where, $limit);
-        if ($sql !== FALSE) {
-            $con = $this->con; //$this->getConnect();
-            if ($this->m_query($con, $sql)) {
+        if ($sql !== FALSE) {            
+            if ($this->m_query($sql)) {
                 return TRUE;
             } else {
                 return FALSE;
