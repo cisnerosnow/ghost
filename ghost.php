@@ -58,11 +58,11 @@ class Ghost
             if (oci_execute($stid)) {
                 return $stid;
             } else {
-                //not the best way :|
-                //var_dump($stid);
-                $e = oci_error($stid);  // For oci_execute errors pass the statement handle
-                var_dump($e);
-                exit;
+                                                
+                //$e = oci_error($stid);  // For oci_execute errors pass the statement handle
+                //var_dump($e);
+                //exit;
+                return FALSE;
             }
         }
     }
@@ -154,12 +154,29 @@ class Ghost
         }
     }
 
+    public function validateDate($date, $format = 'Y-m-d') {
+        $d = DateTime::createFromFormat($format, $date);
+        // The Y ( 4 digits year ) returns TRUE for any integer with any number of digits so changing the comparison from == to === fixes the issue.
+        return $d && $d->format($format) === $date;
+    }
+
     public function sql_post($option, $params) {
         $fields = '';
         $values = '';
+        $dbType = $this->db_type;
         foreach ($params as $field => $value) {
             $fields .= "$field,";
-            $values .= "'$value',";
+            if ($dbType == 'oracle') {
+                if (is_numeric($value)) {
+                    $values .= "$value,";
+                } else if (strlen($value) == 10 && $this->validateDate($value) === TRUE) {
+                    $values .= "TO_DATE('$value','yyyy-mm-dd'),";                    
+                } else {
+                    $values .= "'$value',";
+                }
+            } else {
+                $values .= "'$value',";
+            }
         }
         $fields = trim($fields, ',');
         $values = trim($values, ',');
@@ -343,18 +360,29 @@ class Ghost
 
     public function sql_delete($table, $where, $limit = 1) {
         if (is_array($where)) {
+            $dbType = $this->db_type;
             $wheres = '';
             foreach ($where as $key => $value) {
-                $wheres .= "$key='$value' AND ";
+                if ($dbType == 'oracle') {
+                    if (is_numeric($value)) {
+                        $wheres .= "$key=$value AND ";
+                    } else {
+                        $wheres .= "$key='$value' AND ";
+                    }
+                } else {
+                    $wheres .= "$key='$value' AND ";
+                }
             }
             $wheres = trim($wheres, ' AND ');
 
-            if ($this->db_type == 'mysql') {
+            if ($dbType == 'mysql') {
                 $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
                 return utf8_decode("DELETE FROM $table WHERE $wheres $limit");
-            } else {
-                $limit = ($limit == FALSE) ? '' : "TOP $limit";
+            } else if ($dbType == 'mssql') {
+                $limit = ($limit == FALSE) ? '' : "TOP($limit)";
                 return utf8_decode("DELETE $limit FROM $table WHERE $wheres");
+            } else if ($dbType == 'oracle') {                
+                return utf8_decode("DELETE FROM $table WHERE $wheres");
             }
         } else {
             return FALSE;
@@ -373,25 +401,39 @@ class Ghost
         return $key;
     }
 
-    public function save_file($param, $path = NULL) {
-        $name = (isset($this->params[$param]['name'])) ? $this->params[$param]['name'] : NULL;
-        if ($name == NULL) {
+    public function save_file($param, $path = NULL) {        
+
+        if (isset($param)) {
+            $name = $param['name'];
+        } else {
+            $name = (isset($this->params[$param]['name'])) ? $this->params[$param]['name'] : NULL;
+        }
+
+        if ($name == NULL) {            
             $data = $this->params[$param];
             if (file_put_contents($path, $data)) {
                 return $path;
             } else {
                 return FALSE;
             }
-        } else {
+        } else {            
             $ext = pathinfo($name, PATHINFO_EXTENSION);
             $name = $this->random_string(48) . ".$ext";
-            $path = ($path == NULL) ? "uploads/$name" : $path;
+            $path = ($path == NULL) ? "uploads/$name" : $path;            
 
-            if (move_uploaded_file($this->params[$param]['tmp_name'], $path)) {
-                return $path;
+            if (isset($param)) {             
+                if (move_uploaded_file($param['tmp_name'], $path)) {
+                    return $path;
+                } else {
+                    return FALSE;
+                }
             } else {
-                return FALSE;
-            }
+                if (move_uploaded_file($this->params[$param]['tmp_name'], $path)) {
+                    return $path;
+                } else {
+                    return FALSE;
+                }
+            }            
         }
     }
 
@@ -546,6 +588,12 @@ class Ghost
                     //client from being a lazy validator
                     foreach ($rules as $field => $type) {
                         $wparam = (isset($params[$field])) ? $params[$field] : NULL;
+
+                        if ($wparam === NULL) {                         
+                            $wparam = (isset($params['params'][$field])) ? $params['params'][$field] : NULL;
+                            $params[$field] = $wparam;
+                        }
+
                         if ($wparam == NULL) {
                             $this->response(array($field => 'Is required'), 402);
                             break;
@@ -609,7 +657,7 @@ class Ghost
                 }
 
                 $this->option = $option;
-                $this->params = $params;                
+                $this->params = $params;
                 $this->param = (object) $params;
 
                 if ($key['function'] == NULL) {
@@ -710,7 +758,7 @@ class Ghost
         if (in_array($_SERVER['REQUEST_METHOD'], array('POST', 'GET', 'PUT', 'DELETE'))) {
 
             $method = strtolower($_SERVER['REQUEST_METHOD']);
-            $_METHOD = ($method == 'post') ? $_POST : $_GET;
+            $_METHOD = ($method == 'post') ? $_POST : $_GET;            
 
             if (in_array($method, array('put', 'delete'))) {
                 parse_str(file_get_contents('php://input'), $_METHOD);
@@ -720,15 +768,20 @@ class Ghost
             if (is_string($_METHOD['params']) && json_decode($_METHOD['params']) !== NULL) {
                 $_METHOD['params'] = json_decode($_METHOD['params'], TRUE);
             }
-            if (isset($_FILES)) {
+
+            if (isset($_FILES)) {                
                 foreach ($_FILES as $key => $val) { //without using $val it returns an array ($key) instead of keyname ($key) :|
                     if (isset($_METHOD['params'][$key]) == NULL) {
-                        $_METHOD['params'][$key] = $_FILES[$key];
+                        $_METHOD['params'][$key] = $_FILES[$key];                        
                         $this->files[] = $key;
                     }
                 }
-            }
+            }            
 
+            if (!isset($_METHOD['option']) && isset($_METHOD['params']['option'])) {
+                $_METHOD['option'] = $_METHOD['params']['option'];             
+            }
+            
             if (isset($_METHOD['option'])) {
                 $this->method = $method;
                 $this->process($method, $_METHOD['option'], $_METHOD['params']);
@@ -751,6 +804,8 @@ class Ghost
                 $html .= '<table><tr><td>POST</td><td>GET</td><td>PUT</td><td>DELETE</td></tr>';
                 //foreach()$conf['post']
                 //echo $html .= "<div id='{$options[0]}Post'></div>";
+            } else {
+                $this->response('', 500);
             }
             exit;
         }
