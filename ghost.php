@@ -379,7 +379,7 @@ class Ghost
                 $limit = ($limit == FALSE) ? '' : "LIMIT $limit";
                 return utf8_decode("DELETE FROM $table WHERE $wheres $limit");
             } else if ($dbType == 'mssql') {
-                $limit = ($limit == FALSE) ? '' : "TOP $limit";
+                $limit = ($limit == FALSE) ? '' : "TOP($limit)";                
                 return utf8_decode("DELETE $limit FROM $table WHERE $wheres");
             } else if ($dbType == 'oracle') {                
                 return utf8_decode("DELETE FROM $table WHERE $wheres");
