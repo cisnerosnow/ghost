@@ -232,7 +232,7 @@ class Ghost
         } else {
             $orderBy = ($orderBy == NULL) ? '' : "ORDER BY $orderBy";
         }
-        if ($this->dbType == 'mysql') {
+        if ($dbType == 'mysql') {
             return utf8_decode("SELECT $fields_str FROM $table $wheres $orderBy $limit");
         } else {
             return utf8_decode("SELECT $limit $fields_str FROM $table $wheres $orderBy");
