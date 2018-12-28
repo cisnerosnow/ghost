@@ -248,12 +248,12 @@ class Ghost
                 $this->m_query("SET NAMES utf8");
             }
             $res = $this->m_query($sql);
-            $arr = $this->queryToArray($res);
-            if (count($arr) > 0) {
-                return $arr;
-            } else {
+            if ($res === FALSE) {
                 return FALSE;
-            }            
+            } else {
+                $arr = $this->queryToArray($res);
+                return $arr;                
+            }                        
         }
     }
 
