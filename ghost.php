@@ -232,8 +232,8 @@ class Ghost
         } else {
             $orderBy = ($orderBy == NULL) ? '' : "ORDER BY $orderBy";
         }
-        if ($dbType == 'mysql') {
-            return utf8_decode("SELECT $fields_str FROM $table $wheres $orderBy $limit");
+        if ($dbType == 'mysql') {            
+            return "SELECT $fields_str FROM $table $wheres $orderBy $limit"; //now without utf8_decode...i need to implement a way to detect if it's utf8 already to prevent errors
         } else {
             return utf8_decode("SELECT $limit $fields_str FROM $table $wheres $orderBy");
         }
@@ -245,7 +245,7 @@ class Ghost
 
             //Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
             if ($this->db_type == 'myqsl') {
-                $this->m_query("SET NAMES utf8");
+                $this->m_query("SET NAMES 'utf8'");
             }
             $res = $this->m_query($sql);
             if ($res === FALSE) {
@@ -259,19 +259,30 @@ class Ghost
 
     public function queryToArray($res) {
         $results = array();
-        if ($this->db_type == 'oracle') {
+        $dbType = $this->db_type;
+        if ($dbType == 'oracle') {
             if ($this->m_num_rows($res) > 0) {
                 while ($row = $this->m_fetch_assoc($res)) {
                     $results[] = $row;
                 }
             }
-        } else {
-            if ($res == TRUE && $this->m_num_rows($res) > 0) {
+        } else if ($dbType == 'mysql') { 
+            //if ($res == TRUE && $this->m_num_rows($res) > 0) { //not really needed
                 while ($row = $this->m_fetch_assoc($res)) {
+
+                    //Must find a way to get all data already utf8 encoded
+                    foreach ($row as $key => $value) {
+                        $row[$key] = utf8_encode($value);
+                    }
+
                     $results[] = $row;
                 }
-            }
-        }        
+            //}
+        } else if ($dbType == 'mssql') {                 
+            while ($row = $this->m_fetch_assoc($res)) {
+                $results[] = $row;
+            }                
+        }  
 
         return $results;
     }
