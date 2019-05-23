@@ -796,25 +796,6 @@ class Ghost
             if (isset($_METHOD['option'])) {
                 $this->method = $method;
                 $this->process($method, $_METHOD['option'], $_METHOD['params']);
-            } else if (isset($_GET['doc'])) {
-                $conf = $this->conf;
-                $html = '<h1>Options</h1>';
-                $html .= '<ul>';
-                $options = array();
-                foreach ($conf as $method => $method_conf) {
-                    foreach ($method_conf as $key => $value) {
-                        $option = $value['option'];
-                        if (!in_array($option, $options)) {
-                            $options[] = $value['option'];
-                            $html .= "<li>$option</li>";
-                        }
-                    }
-                }
-                $html .= '</ul>';
-                $html .= '<h3>'.$options[0].'</h3>';
-                $html .= '<table><tr><td>POST</td><td>GET</td><td>PUT</td><td>DELETE</td></tr>';
-                //foreach()$conf['post']
-                //echo $html .= "<div id='{$options[0]}Post'></div>";
             } else {
                 $this->response('', 500);
             }
