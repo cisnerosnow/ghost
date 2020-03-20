@@ -55,6 +55,9 @@ class Ghost
             return mssql_query($query, $con);
         } else if ($dbType == 'oracle') {            
             $stid = oci_parse($con, $query);
+            if ($stid === FALSE) {
+                return FALSE;
+            }
             if (oci_execute($stid)) {
                 return $stid;
             } else {
@@ -148,7 +151,7 @@ class Ghost
     //https://stackoverflow.com/questions/18910814/best-practice-to-generate-random-token-for-forgot-password
     public function createToken($length = 32) {
         if (function_exists('bin2hex') && function_exists('random_bytes')) {
-            return bin2hex(random_bytes($length));
+            return substr(bin2hex(random_bytes($length)), 0, $length);
         } else {
             return $this->random_string($length);
         }
@@ -241,19 +244,34 @@ class Ghost
 
     public function get($table, $fields, $where = NULL, $limit = 1, $orderBy = NULL) {
         $sql = $this->sql_get($table, $fields, $where, $limit, $orderBy);
-        if ($sql !== FALSE) {            
+        if ($sql !== FALSE) {
+            $dbType = $this->db_type;
 
             //Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
-            if ($this->db_type == 'myqsl') {
+            if ($dbType == 'mysql') {
                 $this->m_query("SET NAMES 'utf8'");
+                $res = $this->m_query($sql);
+                if ($res !== FALSE) {                    
+                    if (mysqli_num_rows($res) > 0) {
+                        $arr = $this->queryToArray($res);
+                        return $arr;
+                    } else {
+                        return FALSE;
+                    }
+                } else {
+                    return FALSE;
+                }
+            } else {                
+                $res = $this->m_query($sql);
+                if ($res === FALSE) {
+                    return FALSE;
+                } else {
+                    $arr = $this->queryToArray($res);
+                    return $arr;                
+                }
             }
-            $res = $this->m_query($sql);
-            if ($res === FALSE) {
-                return FALSE;
-            } else {
-                $arr = $this->queryToArray($res);
-                return $arr;                
-            }                        
+        } else {
+            return FALSE;
         }
     }
 
@@ -272,7 +290,7 @@ class Ghost
 
                     //Must find a way to get all data already utf8 encoded
                     foreach ($row as $key => $value) {
-                        $row[$key] = utf8_encode($value);
+                        $row[$key] = is_numeric($value) ? (is_float($value) ? floatval($value) : intval($value)) : utf8_encode($value);
                     }
 
                     $results[] = $row;
