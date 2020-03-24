@@ -596,7 +596,7 @@ class Ghost
                         $params = json_decode($params, TRUE);
                     }
                     $rules = $key['rules'];
-
+                    
                     if (in_array($method, array('put', 'delete'))) {
 
                         //Lo deje comentado porque no siempre  lleva un parametro id, hay veces que es tipo token o algo asi, puedo dejarlo para despues para declararlo como key
@@ -612,74 +612,76 @@ class Ghost
                         $this->response('El número de parámetros no coincide con los esperados', 401);
                     }*/
 
-                    //Validations must stop at the first error, that way we
-                    //mantain the server cool and stop the
-                    //client from being a lazy validator
-                    foreach ($rules as $field => $type) {
-                        $wparam = (isset($params[$field])) ? $params[$field] : NULL;
+                    if ($rules !== NULL) {
+                        //Validations must stop at the first error, that way we
+                        //mantain the server cool and stop the
+                        //client from being a lazy validator
+                        foreach ($rules as $field => $type) {
+                            $wparam = (isset($params[$field])) ? $params[$field] : NULL;
 
-                        if ($wparam === NULL) {                         
-                            $wparam = (isset($params['params'][$field])) ? $params['params'][$field] : NULL;
-                            $params[$field] = $wparam;
-                        }
-
-                        if ($wparam == NULL) {
-                            $this->response(array($field => 'Is required'), 402);
-                            break;
-                        }
-
-                        if (is_array($type) || is_object($type)) {
-                            $paramValidators = $type;
-                            $validator = $this->validator($field, $wparam, $paramValidators);
-                            if ($validator !== TRUE) {
-                                $this->response($validator, 500);
+                            if ($wparam === NULL) {                         
+                                $wparam = (isset($params['params'][$field])) ? $params['params'][$field] : NULL;
+                                $params[$field] = $wparam;
                             }
-                            break;
-                        } else if ($type != 'key' && $type != 'file' && is_callable($type)) { //check if type != 'file' because i got is_callable('file') == TRUE :|
-                            $gastly = (object) array($field => $wparam, 'con' => $this->con); //$this->getConnect());
-                            if (call_user_func($type, $gastly) === FALSE) {
-                                $this->response(array($field => 'Is not valid'), 402);
+
+                            if ($wparam == NULL) {
+                                $this->response(array($field => 'Is required'), 402);
+                                break;
                             }
-                            break;
-                        } else {
-                            switch($type) {
-                                case 'text':
-                                    if (!is_string($wparam)) {
-                                        $this->response(array($field => 'Gotta be text'), 402);
-                                    }
-                                    break;
-                                case 'int':
-                                    if (!is_numeric($wparam)) {
-                                        $this->response(array($field => 'Gotta be numeric'), 402);
-                                    }
-                                    break;
-                                case 'email':
-                                    if (filter_var($wparam, FILTER_VALIDATE_EMAIL) === false) {
-                                        $this->response(array($field => 'Gotta be a valid email'), 402);
-                                    }
-                                    break;
-                                case 'file':
-                                    if (!isset($_FILES)) {
-                                        $this->response(array($field => 'Gotta select a file to update it'), 402);
-                                    }
-                                    break;
-                                case 'json':
-                                    if (!is_string($wparam) || json_decode($wparam) === NULL) {
-                                        $this->response(array($field => 'Gotta be a JSON'), 402);
-                                    }
-                                    break;
-                                case 'array':
-                                    if (is_array($wparam) === FALSE) {
-                                        $this->response(array($field => 'Gotta be an array'), 402);
-                                    }
-                                    break;
-                                case 'key':
-                                    if (is_numeric($wparam)) {
-                                        $this->key = $field;
-                                    } else {
-                                        $this->response(array($field => 'Gotta be numeric'), 402);
-                                    }
-                                    break;
+
+                            if (is_array($type) || is_object($type)) {
+                                $paramValidators = $type;
+                                $validator = $this->validator($field, $wparam, $paramValidators);
+                                if ($validator !== TRUE) {
+                                    $this->response($validator, 500);
+                                }
+                                break;
+                            } else if ($type != 'key' && $type != 'file' && is_callable($type)) { //check if type != 'file' because i got is_callable('file') == TRUE :|
+                                $gastly = (object) array($field => $wparam, 'con' => $this->con); //$this->getConnect());
+                                if (call_user_func($type, $gastly) === FALSE) {
+                                    $this->response(array($field => 'Is not valid'), 402);
+                                }
+                                break;
+                            } else {
+                                switch($type) {
+                                    case 'text':
+                                        if (!is_string($wparam)) {
+                                            $this->response(array($field => 'Gotta be text'), 402);
+                                        }
+                                        break;
+                                    case 'int':
+                                        if (!is_numeric($wparam)) {
+                                            $this->response(array($field => 'Gotta be numeric'), 402);
+                                        }
+                                        break;
+                                    case 'email':
+                                        if (filter_var($wparam, FILTER_VALIDATE_EMAIL) === false) {
+                                            $this->response(array($field => 'Gotta be a valid email'), 402);
+                                        }
+                                        break;
+                                    case 'file':
+                                        if (!isset($_FILES)) {
+                                            $this->response(array($field => 'Gotta select a file to update it'), 402);
+                                        }
+                                        break;
+                                    case 'json':
+                                        if (!is_string($wparam) || json_decode($wparam) === NULL) {
+                                            $this->response(array($field => 'Gotta be a JSON'), 402);
+                                        }
+                                        break;
+                                    case 'array':
+                                        if (is_array($wparam) === FALSE) {
+                                            $this->response(array($field => 'Gotta be an array'), 402);
+                                        }
+                                        break;
+                                    case 'key':
+                                        if (is_numeric($wparam)) {
+                                            $this->key = $field;
+                                        } else {
+                                            $this->response(array($field => 'Gotta be numeric'), 402);
+                                        }
+                                        break;
+                                }
                             }
                         }
                     }
