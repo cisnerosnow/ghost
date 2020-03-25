@@ -7,7 +7,7 @@ class Ghost
     public $param = NULL;
     public $method = NULL;
     public $option = NULL;
-	public $files = array();
+    public $files = array();
     public $con = NULL;
     public $host = NULL;
     public $user = NULL;
@@ -208,8 +208,9 @@ class Ghost
             $fields_str  = trim($fields_str, ',');
         }
 
-        $wheres = '';
+        $wheres = " WHERE $where ";
         if (is_array($where) && count($where) > 0) {
+            $wheres = '';
             foreach ($where as $key => $value) {
                 $wheres .= "$key='$value' AND ";
             }
@@ -619,7 +620,7 @@ class Ghost
                         foreach ($rules as $field => $type) {
                             $wparam = (isset($params[$field])) ? $params[$field] : NULL;
 
-                            if ($wparam === NULL) {                         
+                            if ($wparam === NULL) {
                                 $wparam = (isset($params['params'][$field])) ? $params['params'][$field] : NULL;
                                 $params[$field] = $wparam;
                             }
