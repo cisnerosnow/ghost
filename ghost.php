@@ -169,6 +169,9 @@ class Ghost
         $dbType = $this->db_type;
         foreach ($params as $field => $value) {
             $fields .= "$field,";
+            if (is_bool($value)) {                        
+                $value = boolval($value);
+            }
             if ($dbType == 'oracle') {
                 if (is_numeric($value)) {
                     $values .= "$value,";
@@ -208,9 +211,21 @@ class Ghost
             $fields_str  = trim($fields_str, ',');
         }
 
-        $wheres = " WHERE $where ";
-        if (is_array($where) && count($where) > 0) {
+        
+        $wheres = ($where === NULL) ? '' : " WHERE $where ";
+        if (is_array($where)) {
             $wheres = '';
+            if (count($where) > 0) {                
+                foreach ($where as $key => $value) {
+                    $wheres .= "$key='$value' AND ";
+                }
+                $wheres = trim($wheres, ' AND ');
+                $wheres = "WHERE $wheres";
+            }
+        }
+
+        $wheres = '';
+        if (is_array($where) && count($where) > 0) {
             foreach ($where as $key => $value) {
                 $wheres .= "$key='$value' AND ";
             }
@@ -245,35 +260,97 @@ class Ghost
 
     public function get($table, $fields, $where = NULL, $limit = 1, $orderBy = NULL) {
         $sql = $this->sql_get($table, $fields, $where, $limit, $orderBy);
-        if ($sql !== FALSE) {
-            $dbType = $this->db_type;
-
-            //Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
-            if ($dbType == 'mysql') {
-                $this->m_query("SET NAMES 'utf8'");
-                $res = $this->m_query($sql);
-                if ($res !== FALSE) {                    
-                    if (mysqli_num_rows($res) > 0) {
-                        $arr = $this->queryToArray($res);
-                        return $arr;
-                    } else {
-                        return FALSE;
-                    }
-                } else {
-                    return FALSE;
-                }
-            } else {                
-                $res = $this->m_query($sql);
-                if ($res === FALSE) {
-                    return FALSE;
-                } else {
-                    $arr = $this->queryToArray($res);
-                    return $arr;                
-                }
-            }
-        } else {
+        if ($sql === FALSE) {
             return FALSE;
         }
+        
+        $dbType = $this->db_type;
+
+        //Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
+        if ($dbType == 'mysql') {
+            $this->m_query("SET NAMES 'utf8'");
+            $res = $this->m_query($sql);
+            if ($res !== FALSE) {                    
+                if (mysqli_num_rows($res) > 0) {
+                    $arr = $this->queryToArray($res);
+                    return $arr;
+                } else {
+                    return FALSE;
+                }
+            } else {
+                return FALSE;
+            }
+        } else {                
+            $res = $this->m_query($sql);
+            if ($res === FALSE) {
+                return FALSE;
+            } else {
+                $arr = $this->queryToArray($res);
+                return $arr;                
+            }
+        }        
+    }
+
+    public function getAll($param1, $fields = NULL, $where = NULL, $orderBy = NULL) {
+        if (is_array($param1)) {
+            $table = $param1['table'];
+            $fields = $param1['fields'];
+            $where = $param1['where'];
+            $orderBy = $param1['orderBy'];
+        } else {
+            $table = $param1;
+        }
+
+        if ($orderBy === NULL) {            
+            foreach ($fields as $field) {                
+                $orderBy = $field;
+                break;
+            }
+        }
+
+        return $this->get($table, $fields, $where, NULL, $orderBy);        
+    }
+
+    //$fields1 only works with one field
+    //$fields2 must contain de key and the value
+    public function joinData($arr1, $fields1, $arr2, $fields2, $replace = FALSE) {
+        //$arr = array();
+        $len1 = count($arr1);
+        $len2 = count($arr2);
+
+        if (array_keys($fields1) !== range(0, count($fields1) - 1)) {
+            //$fields1 es asociativo
+            foreach ($fields1 as $key => $value) {
+                $field1 = $key;
+                $field1NewName = $value;
+                break;
+            }
+        } else {
+            $field1 = $fields1;
+            $field1NewName = $field1;
+        }        
+
+        for ($i = 0; $i < $len1; $i++) {
+            $key = $arr1[$i][$field1];
+            $name = '';
+            for ($j = 0; $j < $len2; $j++) {
+                if ($key == $arr2[$j][$fields2[0]]) {
+                    $name = $arr2[$j][$fields2[1]];
+                    break;
+                }
+            }            
+            
+            $arr1[$i][$field1NewName] = $name;
+            //$arr[] = $arr1[$i];
+        }
+
+        if ($replace == TRUE) {
+            for ($i = 0; $i < $len1; $i++) {
+                unset($arr1[$i][$field1]);
+            }
+        }
+
+        return $arr1;
     }
 
     public function queryToArray($res) {
@@ -306,12 +383,49 @@ class Ghost
         return $results;
     }
 
+    //Only for mySQL
+    public function getPlain($table, $fields, $where = NULL, $limit = 1, $orderBy = NULL) {
+
+        $dbType = $this->db_type;        
+        if ($dbType != 'mysql') {
+            return FALSE;            
+        }
+
+        $sql = $this->sql_get($table, $fields, $where, $limit, $orderBy);
+        if ($sql === FALSE) {
+            return FALSE;
+        }        
+
+        $this->m_query("SET NAMES 'utf8'");
+        $res = $this->m_query($sql);
+        if ($res === FALSE) {                    
+            return FALSE;            
+        }
+
+        if (mysqli_num_rows($res) == 0) {
+            return FALSE;            
+        }
+
+        $results = array();
+        while ($row = $this->m_fetch_assoc($res)) {            
+            foreach ($row as $key => $value) {
+                $row[] = is_numeric($value) ? (is_float($value) ? floatval($value) : intval($value)) : utf8_encode($value);
+            }
+            $results[] = $row;
+        }
+        return $results;
+
+    }
+
     public function sql_put($table, $params, $where, $limit = 1) {
         if (is_array($params)) {
             $dbType = $this->db_type;
             $sets = '';
             foreach ($params as $key => $value) {
                 if ($dbType == 'oracle') {
+                    if (is_bool($value)) {                        
+                        $value = boolval($value);
+                    }
                     if (is_numeric($value)) {
                         $sets .= "$key=$value,";
                     } else {
@@ -547,6 +661,30 @@ class Ghost
         }
     }
 
+    public function resp($msg = '', $code = 200) {        
+
+        if (! is_numeric($code)) {
+            if ($code == 'success') {
+                $code = 200;
+            } else {
+                $code = 500;
+            }
+        }
+
+        if ($msg === FALSE) {
+            $code = 500;
+            $msg = '';
+        }
+
+        header("HTTP/1.1 $code; charset=UTF-8");        
+        if (is_array($msg)) {            
+            header('Content-Type: application/json');
+            $msg = json_encode($msg);
+        }        
+        die($msg);
+        exit;
+    }
+
     public function response($msg = '', $code = 200, $typeText = FALSE) {
         if (!is_numeric($code)) {
             if ($code == 'success') {
@@ -653,6 +791,21 @@ class Ghost
                                     case 'int':
                                         if (!is_numeric($wparam)) {
                                             $this->response(array($field => 'Gotta be numeric'), 402);
+                                        }
+                                        break;
+                                    case 'bool':
+
+                                        if (is_string($wparam)) {
+                                            if ($wparam == 'true') {
+                                                $wparam = TRUE;
+                                            } else if ($wparam == 'false') {
+                                                $wparam = FALSE;
+                                            }
+                                            $params[$field] = $wparam;
+                                        }
+
+                                        if (!is_bool($wparam)) {
+                                            $this->response(array($field => 'Gotta be bool'), 402);
                                         }
                                         break;
                                     case 'email':
