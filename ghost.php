@@ -1,4 +1,5 @@
 <?php
+//version 1.0
 class Ghost
 {
     protected $conf = array('post' => array(), 'get' => array(), 'put' => array(), 'delete' => array());
@@ -970,6 +971,18 @@ class Ghost
             if (isset($_METHOD['option'])) {
                 $this->method = $method;
                 $this->process($method, $_METHOD['option'], $_METHOD['params']);
+            } else if (isset($_GET)) {                
+                $option = '';
+                foreach ($_GET as $key => $value) {
+                    $option = trim($key);
+                    break;
+                }
+
+                if ($option == '') {
+                    $this->response('', 500);
+                }
+                $this->method = $method;
+                $this->process($method, $option, $_METHOD);                
             } else {
                 $this->response('', 500);
             }
