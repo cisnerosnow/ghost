@@ -34,8 +34,307 @@ class Ghost
         if ($dbType == 'mysql') {            
             return mysqli_connect($host, $user, $pass, $db_name);
         } else if ($dbType == 'mssql') {
+
+            /*if (!function_exists('mssql_connect')) {
+                function mssql_connect($serverName, $username, $pass, $database = 'PIANOMINAME') {
+                    $connectionInfo = array("ReturnDatesAsStrings"=>TRUE, "Database"=>$database, "UID"=>$username, "PWD"=>$pass,"MultipleActiveResultSets"=>true,"CharacterSet"  => "UTF-8");
+                    return sqlsrv_connect( $serverName, $connectionInfo );
+                }
+            }
+
+            if (!function_exists('mssql_num_fields')) {
+                function mssql_num_fields($res) {
+                    return sqlsrv_num_fields($res);
+                }
+            }
+
+            if (!function_exists('mssql_query2')) {
+                function mssql_query2($query, $link, $scrollable = FALSE) {
+                    if (isset($_SESSION['empresa'])) {
+                        $empresa = intval($_SESSION['empresa']);
+
+                        //Todo este bloque es para agregar el "where empresa=x" si es que el query no lo trae
+                        $generated_query = FALSE;
+                        //$pos = stripos($query, 'INSERT');
+                        //if ($pos !== FALSE) {
+                        $action = 'INSERT';
+                        if (str_starts_with(strtoupper($query), $action)) {
+                            $posA = stripos($query, '(empresa)');
+                            $posB = stripos($query, ',empresa)');
+                            $posC = stripos($query, '(empresa,');
+                            $posD = stripos($query, ',empresa,');
+                            if ($posA === FALSE && $posB === FALSE && $posC === FALSE && $posD === FALSE) {
+                                $pos = stripos($query, ') VALUES');
+                                if ($pos !== FALSE) {
+                                    $query = substr_replace($query, ",empresa", $pos, 0);
+                                }
+
+                                $pos = stripos($query, 'VALUES');
+                                if ($pos !== FALSE) {
+                                    $query = substr(trim($query), 0, -1);
+                                    $query = "$query,$empresa)";
+                                    //$str = get_string_between($query, 'VALUES(', ')');
+                                    //$query = substr_replace($query, ",$empresa", $pos, 0);
+                                }
+                            }
+                        } else {
+                            $found = FALSE;
+                            $action = 'SELECT';
+                            if (!str_starts_with(strtoupper($query), $action)) {
+                                $action = 'UPDATE';
+                                if (!str_starts_with(strtoupper($query), $action)) {
+                                    $action = 'DELETE';
+                                    if (!str_starts_with(strtoupper($query), $action)) {
+                                        //exit("ERROR en query:$query|$action"); //quiere decir que no es select, ni updatee, ni insert, ni delete, esto es raro...
+                                    } else {
+                                    $found = TRUE;
+                                }
+                                } else {
+                                    $found = TRUE;
+                                }
+                            } else {
+                                $found = TRUE;
+                            }
+
+                            if ($found) {
+                                $pos = stripos($query, $action);
+                                if ($pos !== FALSE) {
+                                    $pos = stripos($query, 'WHERE');
+                                    if ($pos === FALSE) {
+
+                                        $pos = stripos($query, 'GROUP BY');
+                                        if ($pos !== FALSE) {
+                                            $query = substr_replace($query, " WHERE empresa=$empresa ", $pos, 0);
+                                            $generated_query = TRUE;
+                                        } else {
+                                            $pos = stripos($query, 'ORDER BY');
+                                            if ($pos === FALSE) {
+                                                $pos = stripos($query, 'LIMIT');
+                                                if ($pos === FALSE) {
+                                                    //Es un select que no tiene where ni order ni limit
+                                                    $query = "$query WHERE empresa=$empresa";
+                                                    $generated_query = TRUE;
+                                                } else {
+                                                    $query = substr_replace($query, " WHERE empresa=$empresa ", $pos, 0);
+                                                    $generated_query = TRUE;
+                                                }
+                                            } else {
+                                                $query = substr_replace($query, " WHERE empresa=$empresa ", $pos, 0);
+                                                $generated_query = TRUE;
+                                            }
+                                        }
+                                    } else {
+                                        $pos = stripos($query, 'empresa=');
+                                        if ($pos === FALSE) {
+                                            $pos = stripos($query, 'GROUP BY');
+                                            if ($pos !== FALSE) {
+                                                $query = substr_replace($query, " AND empresa=$empresa ", $pos, 0);
+                                                $generated_query = TRUE;
+                                            } else {
+                                                $pos = stripos($query, 'ORDER BY');
+                                                if ($pos === FALSE) {
+                                                    $pos = stripos($query, 'LIMIT');
+                                                    if ($pos === FALSE) {
+                                                        //Es un select CON WHERE peeeero que no tiene order ni limit
+                                                        $query = "$query AND empresa=$empresa";
+                                                        $generated_query = TRUE;
+                                                    } else {
+                                                        $query = substr_replace($query, " AND empresa=$empresa ", $pos, 0);
+                                                        $generated_query = TRUE;
+                                                    }
+                                                } else {
+                                                    $query = substr_replace($query, " AND empresa=$empresa ", $pos, 0);
+                                                    $generated_query = TRUE;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    $stmt = mssql_query($query, $link);
+                    return $stmt;
+                }
+            }
+
+            if (!function_exists('get_string_between')) {
+                function get_string_between($string, $start, $end = NULL, $test = FALSE){
+                    $string = ' ' . $string;
+                    $ini = stripos($string, $start);
+                    if ($ini == 0) return '';
+                    $ini += strlen($start);
+                    if ($end != NULL) {
+                        $len = stripos($string, $end, $ini) - $ini;
+                    } else {
+                        $len = strlen($string);
+                    }
+                    //if ($test) {
+                        //exit(substr($string, $ini, $len));
+                        //exit("$string, $ini, $len");
+                    //}
+                    return substr($string, $ini, $len);
+                }
+            }
+
+            if (!function_exists('mssql_fetch_array')) {
+                function mssql_fetch_array($res) {
+                    return sqlsrv_fetch_array($res);//, SQLSRV_FETCH_ASSOC)
+                }
+            }
+
+            if (!function_exists('mssql_fetch_assoc')) {
+                function mssql_fetch_assoc($res) {
+                    return sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC);
+                }
+            }
+
+            if (!function_exists('mssql_num_rows_')) {
+                function mssql_num_rows_($res) {
+                    return sqlsrv_num_rows($res);
+                }
+            }
+
+            if (!function_exists('mssql_num_rows')) {
+                function mssql_num_rows($res) {
+                    return (sqlsrv_has_rows($res) === true) ? 1 : 0;
+                }
+            }
+
+            if (!function_exists('mssql_field_name')) {
+                function mssql_field_name($res, $i) {
+                    return sqlsrv_($res, $i, 'Name');
+                }
+            }
+
+            if (!function_exists('mssql_field_type')) {
+                function mssql_field_type($res, $i) {
+                    return sqlsrv_($res, $i, 'Type');
+                }
+            }
+
+            if (!function_exists('sqlsrv_')) {
+                function sqlsrv_($resx, $i, $opt) {
+                    $index = 0;
+                    $res = '';
+                    foreach (sqlsrv_field_metadata($resx) as $fieldMetadata) {
+                        if ($index++ != $i) {
+                            continue;
+                        }
+                        $res = $fieldMetadata[$opt];
+                        break;
+                    }
+
+                    if ($opt == 'Type') {
+                        switch($res) {
+                            case -5:
+                                $res = 'bigint';
+                                break;
+                            case -2:
+                                $res = 'binary';
+                                break;
+                            case -7:
+                                $res = 'bit';
+                                break;
+                            case 1:
+                                $res = 'char';
+                                break;
+                            case 91:
+                                $res = 'date';
+                                break;
+                            case 93:
+                                $res = 'datetime';
+                                break;
+                            case -155:
+                                $res = 'datetimeoffset';
+                                break;
+                            case 3:
+                                $res = 'decimal';
+                                break;
+                            case 6:
+                                $res = 'float';
+                                break;
+                            case -4:
+                                $res = 'image';
+                                break;
+                            case 4:
+                                $res = 'int';
+                                break;
+                            case 3:
+                                $res = 'money';
+                                break;
+                            case -8:
+                                $res = 'nchar';
+                                break;
+                            case -10:
+                                $res = 'ntext';
+                                break;
+                            case 2:
+                                $res = 'numeric';
+                                break;
+                            case -9:
+                                $res = 'nvarchar';
+                                break;
+                            case 7:
+                                $res = 'real';
+                                break;
+                            case 93:
+                                $res = 'smalldatetime';
+                                break;
+                            case 5:
+                                $res = 'smallint';
+                                break;
+                            case 3:
+                                $res = 'smallmoney';
+                                break;
+                            case -150:
+                                $res = 'sql_variant';
+                                break;
+                            case -1:
+                                $res = 'text';
+                                break;
+                            case -154:
+                                $res = 'time';
+                                break;
+                            case -2:
+                                $res = 'timestamp';
+                                break;
+                            case -6:
+                                $res = 'tinyint';
+                                break;
+                            case -151:
+                                $res = 'udt';
+                                break;
+                            case -11:
+                                $res = 'uniqueidentifier';
+                                break;
+                            case -3:
+                                $res = 'varbinary';
+                                break;
+                            case 12:
+                                $res = 'varchar';
+                                break;
+                            case -152:
+                                $res = 'xml';
+                                break;
+                        }
+                    }
+                    return $res;
+                }
+            }
+
+            if (!function_exists('mssql_select_db')) {
+                function mssql_select_db($database) {
+                    return mssql_connect('192.168.3.231', 'Usr_PIANOMINAME', 'Pias$2*21', $database);
+                }
+            }*/
+
             // Crear una conexión a MSSQL
             $link = mssql_connect($host, $user, $pass);
+            if(!$link) {
+                echo "Conexión no se pudo establecer. $host $user $pass<br />";
+                die( print_r( sqlsrv_errors(), true));
+            }
 
             // Seleccionar la base de datos 'php'
             mssql_select_db($db_name, $link);
@@ -261,98 +560,98 @@ class Ghost
 
     public function get($table, $fields, $where = NULL, $limit = 1, $orderBy = NULL) {
         $sql = $this->sql_get($table, $fields, $where, $limit, $orderBy);
-        if ($sql === FALSE) {
-            return FALSE;
-        }
-        
-        $dbType = $this->db_type;
+if ($sql === FALSE) {
+return FALSE;
+}
 
-        //Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
-        if ($dbType == 'mysql') {
-            $this->m_query("SET NAMES 'utf8'");
-            $res = $this->m_query($sql);
-            if ($res !== FALSE) {                    
-                if (mysqli_num_rows($res) > 0) {
-                    $arr = $this->queryToArray($res);
-                    return $arr;
-                } else {
-                    return FALSE;
-                }
-            } else {
-                return FALSE;
-            }
-        } else {                
-            $res = $this->m_query($sql);
-            if ($res === FALSE) {
-                return FALSE;
-            } else {
-                $arr = $this->queryToArray($res);
-                return $arr;                
-            }
-        }        
-    }
+$dbType = $this->db_type;
 
-    public function getAll($param1, $fields = NULL, $where = NULL, $orderBy = NULL) {
-        if (is_array($param1)) {
-            $table = $param1['table'];
-            $fields = $param1['fields'];
-            $where = $param1['where'];
-            $orderBy = $param1['orderBy'];
-        } else {
-            $table = $param1;
-        }
+//Microsoft SQL no tiene 'SET Names utf8' por eso solo checa si es mysql
+if ($dbType == 'mysql') {
+$this->m_query("SET NAMES 'utf8'");
+$res = $this->m_query($sql);
+if ($res !== FALSE) {                    
+if (mysqli_num_rows($res) > 0) {
+$arr = $this->queryToArray($res);
+return $arr;
+} else {
+return FALSE;
+}
+} else {
+return FALSE;
+}
+} else {                
+$res = $this->m_query($sql);
+if ($res === FALSE) {
+return FALSE;
+} else {
+$arr = $this->queryToArray($res);
+return $arr;                
+}
+}        
+}
 
-        if ($orderBy === NULL) {            
-            foreach ($fields as $field) {                
-                $orderBy = $field;
-                break;
-            }
-        }
+public function getAll($param1, $fields = NULL, $where = NULL, $orderBy = NULL) {
+if (is_array($param1)) {
+$table = $param1['table'];
+$fields = $param1['fields'];
+$where = $param1['where'];
+$orderBy = $param1['orderBy'];
+} else {
+$table = $param1;
+}
 
-        return $this->get($table, $fields, $where, NULL, $orderBy);        
-    }
+if ($orderBy === NULL) {            
+foreach ($fields as $field) {                
+$orderBy = $field;
+break;
+}
+}
 
-    //$fields1 only works with one field
-    //$fields2 must contain de key and the value
-    public function joinData($arr1, $fields1, $arr2, $fields2, $replace = FALSE) {
-        //$arr = array();
-        $len1 = count($arr1);
-        $len2 = count($arr2);
+return $this->get($table, $fields, $where, NULL, $orderBy);        
+}
 
-        if (array_keys($fields1) !== range(0, count($fields1) - 1)) {
-            //$fields1 es asociativo
-            foreach ($fields1 as $key => $value) {
-                $field1 = $key;
-                $field1NewName = $value;
-                break;
-            }
-        } else {
-            $field1 = $fields1;
-            $field1NewName = $field1;
-        }        
+//$fields1 only works with one field
+//$fields2 must contain de key and the value
+public function joinData($arr1, $fields1, $arr2, $fields2, $replace = FALSE) {
+//$arr = array();
+$len1 = count($arr1);
+$len2 = count($arr2);
 
-        for ($i = 0; $i < $len1; $i++) {
-            $key = $arr1[$i][$field1];
-            $name = '';
-            for ($j = 0; $j < $len2; $j++) {
-                if ($key == $arr2[$j][$fields2[0]]) {
-                    $name = $arr2[$j][$fields2[1]];
-                    break;
-                }
-            }            
-            
-            $arr1[$i][$field1NewName] = $name;
-            //$arr[] = $arr1[$i];
-        }
+if (array_keys($fields1) !== range(0, count($fields1) - 1)) {
+//$fields1 es asociativo
+foreach ($fields1 as $key => $value) {
+$field1 = $key;
+$field1NewName = $value;
+break;
+}
+} else {
+$field1 = $fields1;
+$field1NewName = $field1;
+}        
 
-        if ($replace == TRUE) {
-            for ($i = 0; $i < $len1; $i++) {
-                unset($arr1[$i][$field1]);
-            }
-        }
+for ($i = 0; $i < $len1; $i++) {
+$key = $arr1[$i][$field1];
+$name = '';
+for ($j = 0; $j < $len2; $j++) {
+if ($key == $arr2[$j][$fields2[0]]) {
+$name = $arr2[$j][$fields2[1]];
+break;
+}
+}            
 
-        return $arr1;
-    }
+$arr1[$i][$field1NewName] = $name;
+//$arr[] = $arr1[$i];
+}
+
+if ($replace == TRUE) {
+for ($i = 0; $i < $len1; $i++) {
+unset($arr1[$i][$field1]);
+}
+}
+
+return $arr1;
+}
 
     public function queryToArray($res) {
         $results = array();
@@ -736,7 +1035,7 @@ class Ghost
                         $params = json_decode($params, TRUE);
                     }
                     $rules = $key['rules'];
-                    
+
                     if (in_array($method, array('put', 'delete'))) {
 
                         //Lo deje comentado porque no siempre  lleva un parametro id, hay veces que es tipo token o algo asi, puedo dejarlo para despues para declararlo como key
@@ -752,91 +1051,91 @@ class Ghost
                         $this->response('El número de parámetros no coincide con los esperados', 401);
                     }*/
 
-                    if ($rules !== NULL) {
-                        //Validations must stop at the first error, that way we
-                        //mantain the server cool and stop the
-                        //client from being a lazy validator
-                        foreach ($rules as $field => $type) {
-                            $wparam = (isset($params[$field])) ? $params[$field] : NULL;
+if ($rules !== NULL) {
+//Validations must stop at the first error, that way we
+//mantain the server cool and stop the
+//client from being a lazy validator
+foreach ($rules as $field => $type) {
+$wparam = (isset($params[$field])) ? $params[$field] : NULL;
 
-                            if ($wparam === NULL) {
-                                $wparam = (isset($params['params'][$field])) ? $params['params'][$field] : NULL;
-                                $params[$field] = $wparam;
-                            }
+if ($wparam === NULL) {
+$wparam = (isset($params['params'][$field])) ? $params['params'][$field] : NULL;
+$params[$field] = $wparam;
+}
 
-                            if ($wparam == NULL) {
-                                $this->response(array($field => 'Is required'), 402);
-                                break;
-                            }
+if ($wparam == NULL) {
+$this->response(array($field => 'Is required'), 402);
+break;
+}
 
-                            if (is_array($type) || is_object($type)) {
-                                $paramValidators = $type;
-                                $validator = $this->validator($field, $wparam, $paramValidators);
-                                if ($validator !== TRUE) {
-                                    $this->response($validator, 500);
-                                }
-                                break;
-                            } else if ($type != 'key' && $type != 'file' && is_callable($type)) { //check if type != 'file' because i got is_callable('file') == TRUE :|
-                                $gastly = (object) array($field => $wparam, 'con' => $this->con); //$this->getConnect());
-                                if (call_user_func($type, $gastly) === FALSE) {
-                                    $this->response(array($field => 'Is not valid'), 402);
-                                }
-                                break;
-                            } else {
-                                switch($type) {
-                                    case 'text':
-                                        if (!is_string($wparam)) {
-                                            $this->response(array($field => 'Gotta be text'), 402);
-                                        }
-                                        break;
-                                    case 'int':
-                                        if (!is_numeric($wparam)) {
-                                            $this->response(array($field => 'Gotta be numeric'), 402);
-                                        }
-                                        break;
-                                    case 'bool':
+if (is_array($type) || is_object($type)) {
+$paramValidators = $type;
+$validator = $this->validator($field, $wparam, $paramValidators);
+if ($validator !== TRUE) {
+$this->response($validator, 500);
+}
+break;
+} else if ($type != 'key' && $type != 'file' && is_callable($type)) { //check if type != 'file' because i got is_callable('file') == TRUE :|
+$gastly = (object) array($field => $wparam, 'con' => $this->con); //$this->getConnect());
+if (call_user_func($type, $gastly) === FALSE) {
+$this->response(array($field => 'Is not valid'), 402);
+}
+break;
+} else {
+switch($type) {
+case 'text':
+if (!is_string($wparam)) {
+$this->response(array($field => 'Gotta be text'), 402);
+}
+break;
+case 'int':
+if (!is_numeric($wparam)) {
+$this->response(array($field => 'Gotta be numeric'), 402);
+}
+break;
+case 'bool':
 
-                                        if (is_string($wparam)) {
-                                            if ($wparam == 'true') {
-                                                $wparam = TRUE;
-                                            } else if ($wparam == 'false') {
-                                                $wparam = FALSE;
-                                            }
-                                            $params[$field] = $wparam;
-                                        }
+if (is_string($wparam)) {
+if ($wparam == 'true') {
+$wparam = TRUE;
+} else if ($wparam == 'false') {
+$wparam = FALSE;
+}
+$params[$field] = $wparam;
+}
 
-                                        if (!is_bool($wparam)) {
-                                            $this->response(array($field => 'Gotta be bool'), 402);
-                                        }
-                                        break;
-                                    case 'email':
-                                        if (filter_var($wparam, FILTER_VALIDATE_EMAIL) === false) {
-                                            $this->response(array($field => 'Gotta be a valid email'), 402);
-                                        }
-                                        break;
-                                    case 'file':
-                                        if (!isset($_FILES)) {
-                                            $this->response(array($field => 'Gotta select a file to update it'), 402);
-                                        }
-                                        break;
-                                    case 'json':
-                                        if (!is_string($wparam) || json_decode($wparam) === NULL) {
-                                            $this->response(array($field => 'Gotta be a JSON'), 402);
-                                        }
-                                        break;
-                                    case 'array':
-                                        if (is_array($wparam) === FALSE) {
-                                            $this->response(array($field => 'Gotta be an array'), 402);
-                                        }
-                                        break;
-                                    case 'key':
-                                        if (is_numeric($wparam)) {
-                                            $this->key = $field;
-                                        } else {
-                                            $this->response(array($field => 'Gotta be numeric'), 402);
-                                        }
-                                        break;
-                                }
+if (!is_bool($wparam)) {
+$this->response(array($field => 'Gotta be bool'), 402);
+}
+break;
+case 'email':
+if (filter_var($wparam, FILTER_VALIDATE_EMAIL) === false) {
+$this->response(array($field => 'Gotta be a valid email'), 402);
+}
+break;
+case 'file':
+if (!isset($_FILES)) {
+$this->response(array($field => 'Gotta select a file to update it'), 402);
+}
+break;
+case 'json':
+if (!is_string($wparam) || json_decode($wparam) === NULL) {
+$this->response(array($field => 'Gotta be a JSON'), 402);
+}
+break;
+case 'array':
+if (is_array($wparam) === FALSE) {
+$this->response(array($field => 'Gotta be an array'), 402);
+}
+break;
+case 'key':
+if (is_numeric($wparam)) {
+$this->key = $field;
+} else {
+$this->response(array($field => 'Gotta be numeric'), 402);
+}
+break;
+}
                             }
                         }
                     }
