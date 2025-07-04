@@ -1,5 +1,5 @@
 <?php
-//version 1.0
+//version 1.0.1
 class Ghost
 {
     protected $conf = array('post' => array(), 'get' => array(), 'put' => array(), 'delete' => array());
@@ -510,10 +510,8 @@ class Ghost
             }
             $fields_str  = trim($fields_str, ',');
         }
-
-        
-        $wheres = ($where === NULL) ? '' : " WHERE $where ";
-        if (is_array($where)) {
+                
+        /*if (is_array($where)) {
             $wheres = '';
             if (count($where) > 0) {                
                 foreach ($where as $key => $value) {
@@ -522,9 +520,11 @@ class Ghost
                 $wheres = trim($wheres, ' AND ');
                 $wheres = "WHERE $wheres";
             }
-        }
+        } else {
+            $wheres = ($where === NULL) ? '' : " WHERE $where ";
+        }*/
 
-        $wheres = '';
+        $wheres = ($where !== NULL && is_string($where)) ? " WHERE $where " : '';
         if (is_array($where) && count($where) > 0) {
             foreach ($where as $key => $value) {
                 $wheres .= "$key='$value' AND ";
