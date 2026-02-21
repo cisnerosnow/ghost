@@ -16,6 +16,7 @@ class Ghost
     public $db_name = NULL;
     public $key = NULL;
     protected $db_type = 'mysql';
+    public $allowedOrigins = [];
 
     public function connect($host, $user, $pass, $db_name) {
         $this->host = $host;
@@ -1290,7 +1291,11 @@ break;
     }
 
     public function run() {
-        header('Access-Control-Allow-Origin: *');
+        $origin = isset($_SERVER['HTTP_ORIGIN']) ? $_SERVER['HTTP_ORIGIN'] : '';
+        if (!empty($this->allowedOrigins) && in_array($origin, $this->allowedOrigins)) {
+            header("Access-Control-Allow-Origin: $origin");
+            header('Vary: Origin');
+        }
         if (in_array($_SERVER['REQUEST_METHOD'], array('POST', 'GET', 'PUT', 'DELETE'))) {
 
             $method = strtolower($_SERVER['REQUEST_METHOD']);
