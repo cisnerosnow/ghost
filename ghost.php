@@ -871,7 +871,22 @@ return $arr1;
         return $key;
     }
 
-    public function save_file($param, $path = NULL) {        
+    public function save_file($param, $path = NULL, $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'xlsx', 'xls', 'csv', 'txt', 'doc', 'docx']) {
+
+        // MIME types considered safe for each allowed extension
+        $safeMimes = [
+            'jpg'  => ['image/jpeg'],
+            'jpeg' => ['image/jpeg'],
+            'png'  => ['image/png'],
+            'gif'  => ['image/gif'],
+            'pdf'  => ['application/pdf'],
+            'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip'],
+            'xls'  => ['application/vnd.ms-excel'],
+            'csv'  => ['text/plain', 'text/csv', 'application/csv'],
+            'txt'  => ['text/plain'],
+            'doc'  => ['application/msword'],
+            'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/zip'],
+        ];
 
         if (isset($param)) {
             $name = $param['name'];
@@ -879,31 +894,41 @@ return $arr1;
             $name = (isset($this->params[$param]['name'])) ? $this->params[$param]['name'] : NULL;
         }
 
-        if ($name == NULL) {            
+        if ($name == NULL) {
             $data = $this->params[$param];
             if (file_put_contents($path, $data)) {
                 return $path;
             } else {
                 return FALSE;
             }
-        } else {            
-            $ext = pathinfo($name, PATHINFO_EXTENSION);
-            $name = $this->random_string(48) . ".$ext";
-            $path = ($path == NULL) ? "uploads/$name" : $path;            
+        } else {
+            $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 
-            if (isset($param)) {             
-                if (move_uploaded_file($param['tmp_name'], $path)) {
-                    return $path;
-                } else {
+            // Validate extension against whitelist
+            if (!in_array($ext, $allowedExtensions)) {
+                return FALSE;
+            }
+
+            // Validate real MIME type of the uploaded file
+            $tmpName = isset($param['tmp_name']) ? $param['tmp_name'] : $this->params[$param]['tmp_name'];
+            if (function_exists('finfo_open')) {
+                $finfo    = finfo_open(FILEINFO_MIME_TYPE);
+                $mimeType = finfo_file($finfo, $tmpName);
+                finfo_close($finfo);
+                $allowed  = isset($safeMimes[$ext]) ? $safeMimes[$ext] : [];
+                if (!empty($allowed) && !in_array($mimeType, $allowed)) {
                     return FALSE;
                 }
+            }
+
+            $name = $this->random_string(48) . ".$ext";
+            $path = ($path == NULL) ? "uploads/$name" : $path;
+
+            if (move_uploaded_file($tmpName, $path)) {
+                return $path;
             } else {
-                if (move_uploaded_file($this->params[$param]['tmp_name'], $path)) {
-                    return $path;
-                } else {
-                    return FALSE;
-                }
-            }            
+                return FALSE;
+            }
         }
     }
 
