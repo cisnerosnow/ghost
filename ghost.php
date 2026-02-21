@@ -427,11 +427,7 @@ class Ghost
     }
 
     public function get_connect() {
-        $this->host = $host;
-        $this->user = $user;
-        $this->pass = $pass;
-        $this->db_name = $db_name;    
-        return $this->m_connect($host, $user, $pass, $db_name);        
+        return $this->m_connect($this->host, $this->user, $this->pass, $this->db_name);
     }
 
     public function getConnect() {
@@ -469,11 +465,12 @@ class Ghost
 
     //https://stackoverflow.com/questions/18910814/best-practice-to-generate-random-token-for-forgot-password
     public function createToken($length = 32) {
-        if (function_exists('bin2hex') && function_exists('random_bytes')) {
+        if (function_exists('random_bytes')) {
             return substr(bin2hex(random_bytes($length)), 0, $length);
-        } else {
-            return $this->random_string($length);
+        } else if (function_exists('openssl_random_pseudo_bytes')) {
+            return substr(bin2hex(openssl_random_pseudo_bytes($length)), 0, $length);
         }
+        throw new \RuntimeException('No secure random source available. Upgrade to PHP 7+.');
     }
 
     public function validateDate($date, $format = 'Y-m-d') {
@@ -1115,7 +1112,7 @@ $wparam = (isset($params['params'][$field])) ? $params['params'][$field] : NULL;
 $params[$field] = $wparam;
 }
 
-if ($wparam == NULL) {
+if ($wparam === NULL) {
 $this->response(array($field => 'Is required'), 402);
 break;
 }
@@ -1255,7 +1252,7 @@ break;
             }
         }
 
-        if (count($valid) == 3) {
+        if (count($valid) == count($rules)) {
             return TRUE;
         } else {
             return FALSE;
