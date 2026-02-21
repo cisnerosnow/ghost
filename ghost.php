@@ -332,8 +332,8 @@ class Ghost
             // Crear una conexión a MSSQL
             $link = mssql_connect($host, $user, $pass);
             if(!$link) {
-                echo "Conexión no se pudo establecer. $host $user $pass<br />";
-                die( print_r( sqlsrv_errors(), true));
+                error_log("MSSQL connection failed. Host: $host, User: $user. Errors: " . print_r(sqlsrv_errors(), true));
+                die("Error de conexión con la base de datos.");
             }
 
             // Seleccionar la base de datos 'php'

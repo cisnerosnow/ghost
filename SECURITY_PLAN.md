@@ -11,7 +11,7 @@
 |---|---------------|-----------|--------|
 | 1 | SQL Injection — valores sin escapar | 🔴 Crítico | ✅ Resuelto |
 | 2 | Inyección de nombre de tabla/columna | 🔴 Crítico | ✅ Resuelto |
-| 3 | Credenciales expuestas en error de conexión | 🟠 Alto | ⬜ Pendiente |
+| 3 | Credenciales expuestas en error de conexión | 🟠 Alto | ✅ Resuelto |
 | 4 | Upload sin validación de tipo de archivo | 🟠 Alto | ⬜ Pendiente |
 | 5 | CORS completamente abierto (`*`) | 🟠 Alto | ⬜ Pendiente |
 | 6 | Comparación laxa `== NULL` en validación | 🟡 Medio | ⬜ Pendiente |
@@ -79,7 +79,7 @@ Llamarlo en `sql_post`, `sql_get`, `sql_put`, `sql_delete` sobre `$table`, `$opt
 
 ### ✅ Issue #3 — Credenciales expuestas en error de conexión
 **Severidad:** 🟠 Alto
-**Estado:** ⬜ Pendiente
+**Estado:** ✅ Resuelto — 2026-02-21
 **Archivos:** `ghost.php`
 **Líneas afectadas:** 335-336
 
