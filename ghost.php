@@ -407,6 +407,16 @@ class Ghost
         }
     }
 
+    private function m_escape($value) {
+        $dbType = $this->db_type;
+        if ($dbType == 'mysql') {
+            return mysqli_real_escape_string($this->con, $value);
+        } else {
+            // Para MSSQL y Oracle: escape básico de caracteres peligrosos
+            return str_replace(["'", "\\", "\x00", "\n", "\r", "\x1a"], ["''", "\\\\", "", "\\n", "\\r", "\\Z"], $value);
+        }
+    }
+
     public function get_connect() {
         $this->host = $host;
         $this->user = $user;
@@ -476,12 +486,12 @@ class Ghost
                 if (is_numeric($value)) {
                     $values .= "$value,";
                 } else if (strlen($value) == 10 && $this->validateDate($value) === TRUE) {
-                    $values .= "TO_DATE('$value','yyyy-mm-dd'),";                    
+                    $values .= "TO_DATE('$value','yyyy-mm-dd'),";
                 } else {
-                    $values .= "'$value',";
+                    $values .= "'" . $this->m_escape($value) . "',";
                 }
             } else {
-                $values .= "'$value',";
+                $values .= "'" . $this->m_escape($value) . "',";
             }
         }
         $fields = trim($fields, ',');
@@ -527,7 +537,7 @@ class Ghost
         $wheres = ($where !== NULL && is_string($where)) ? " WHERE $where " : '';
         if (is_array($where) && count($where) > 0) {
             foreach ($where as $key => $value) {
-                $wheres .= "$key='$value' AND ";
+                $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
             }
             $wheres = trim($wheres, ' AND ');
             $wheres = "WHERE $wheres";
@@ -723,16 +733,16 @@ return $arr1;
             $sets = '';
             foreach ($params as $key => $value) {
                 if ($dbType == 'oracle') {
-                    if (is_bool($value)) {                        
+                    if (is_bool($value)) {
                         $value = boolval($value);
                     }
                     if (is_numeric($value)) {
                         $sets .= "$key=$value,";
                     } else {
-                        $sets .= "$key='$value',";
+                        $sets .= "$key='" . $this->m_escape($value) . "',";
                     }
                 } else {
-                    $sets .= "$key='$value',";
+                    $sets .= "$key='" . $this->m_escape($value) . "',";
                 }
             }
             $sets = trim($sets, ',');
@@ -742,12 +752,12 @@ return $arr1;
                 if ($dbType == 'oracle') {
                     if (is_numeric($value)) {
                         $wheres .= "$key=$value AND ";
-                    } else { 
-                        $wheres .= "$key='$value' AND ";
+                    } else {
+                        $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
                     }
-                } else { 
-                    $wheres .= "$key='$value' AND ";
-                }                
+                } else {
+                    $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
+                }
             }
             $wheres = trim($wheres, ' AND ');            
             if ($dbType == 'mysql') {
@@ -811,10 +821,10 @@ return $arr1;
                     if (is_numeric($value)) {
                         $wheres .= "$key=$value AND ";
                     } else {
-                        $wheres .= "$key='$value' AND ";
+                        $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
                     }
                 } else {
-                    $wheres .= "$key='$value' AND ";
+                    $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
                 }
             }
             $wheres = trim($wheres, ' AND ');
