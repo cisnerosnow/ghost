@@ -417,6 +417,14 @@ class Ghost
         }
     }
 
+    private function sanitizeIdentifier($name) {
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name)) {
+            $this->response('Invalid identifier', 400);
+            exit;
+        }
+        return $name;
+    }
+
     public function get_connect() {
         $this->host = $host;
         $this->user = $user;
@@ -477,9 +485,10 @@ class Ghost
         $fields = '';
         $values = '';
         $dbType = $this->db_type;
+        $table  = $this->sanitizeIdentifier($option);
         foreach ($params as $field => $value) {
-            $fields .= "$field,";
-            if (is_bool($value)) {                        
+            $fields .= $this->sanitizeIdentifier($field) . ",";
+            if (is_bool($value)) {
                 $value = boolval($value);
             }
             if ($dbType == 'oracle') {
@@ -496,7 +505,7 @@ class Ghost
         }
         $fields = trim($fields, ',');
         $values = trim($values, ',');
-        $sql = "INSERT INTO $option($fields) VALUES($values)";
+        $sql = "INSERT INTO $table($fields) VALUES($values)";
         $sql = utf8_decode($sql);
         return $sql;
     }
@@ -512,18 +521,20 @@ class Ghost
 
     public function sql_get($table, $fields = NULL, $where = NULL, $limit = 1, $orderBy = NULL) {
 
+        $table = $this->sanitizeIdentifier($table);
+
         $fields_str = '*';
         if (is_array($fields) && count($fields) > 0) {
             $fields_str = '';
             foreach ($fields as $field) {
-                $fields_str .= "$field,";
+                $fields_str .= $this->sanitizeIdentifier($field) . ",";
             }
-            $fields_str  = trim($fields_str, ',');
+            $fields_str = trim($fields_str, ',');
         }
-                
+
         /*if (is_array($where)) {
             $wheres = '';
-            if (count($where) > 0) {                
+            if (count($where) > 0) {
                 foreach ($where as $key => $value) {
                     $wheres .= "$key='$value' AND ";
                 }
@@ -537,7 +548,7 @@ class Ghost
         $wheres = ($where !== NULL && is_string($where)) ? " WHERE $where " : '';
         if (is_array($where) && count($where) > 0) {
             foreach ($where as $key => $value) {
-                $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
+                $wheres .= $this->sanitizeIdentifier($key) . "='" . $this->m_escape($value) . "' AND ";
             }
             $wheres = trim($wheres, ' AND ');
             $wheres = "WHERE $wheres";
@@ -554,14 +565,14 @@ class Ghost
         if (is_array($orderBy)) {
             $sql = 'ORDER BY ';
             foreach ($orderBy as $key => $value) {
-                $sql .= "$key $value, ";
+                $sql .= $this->sanitizeIdentifier($key) . " $value, ";
             }
             $sql = trim($sql, ',');
             $orderBy = $sql;
         } else {
             $orderBy = ($orderBy == NULL) ? '' : "ORDER BY $orderBy";
         }
-        if ($dbType == 'mysql') {            
+        if ($dbType == 'mysql') {
             return "SELECT $fields_str FROM $table $wheres $orderBy $limit"; //now without utf8_decode...i need to implement a way to detect if it's utf8 already to prevent errors
         } else {
             return utf8_decode("SELECT $limit $fields_str FROM $table $wheres $orderBy");
@@ -730,36 +741,39 @@ return $arr1;
     public function sql_put($table, $params, $where, $limit = 1) {
         if (is_array($params)) {
             $dbType = $this->db_type;
+            $table  = $this->sanitizeIdentifier($table);
             $sets = '';
             foreach ($params as $key => $value) {
+                $col = $this->sanitizeIdentifier($key);
                 if ($dbType == 'oracle') {
                     if (is_bool($value)) {
                         $value = boolval($value);
                     }
                     if (is_numeric($value)) {
-                        $sets .= "$key=$value,";
+                        $sets .= "$col=$value,";
                     } else {
-                        $sets .= "$key='" . $this->m_escape($value) . "',";
+                        $sets .= "$col='" . $this->m_escape($value) . "',";
                     }
                 } else {
-                    $sets .= "$key='" . $this->m_escape($value) . "',";
+                    $sets .= "$col='" . $this->m_escape($value) . "',";
                 }
             }
             $sets = trim($sets, ',');
 
             $wheres = '';
             foreach ($where as $key => $value) {
+                $col = $this->sanitizeIdentifier($key);
                 if ($dbType == 'oracle') {
                     if (is_numeric($value)) {
-                        $wheres .= "$key=$value AND ";
+                        $wheres .= "$col=$value AND ";
                     } else {
-                        $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
+                        $wheres .= "$col='" . $this->m_escape($value) . "' AND ";
                     }
                 } else {
-                    $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
+                    $wheres .= "$col='" . $this->m_escape($value) . "' AND ";
                 }
             }
-            $wheres = trim($wheres, ' AND ');            
+            $wheres = trim($wheres, ' AND ');
             if ($dbType == 'mysql') {
                 return utf8_decode("UPDATE $table SET $sets WHERE $wheres LIMIT $limit");
             } else if ($dbType == 'mssql') {
@@ -815,16 +829,18 @@ return $arr1;
     public function sql_delete($table, $where, $limit = 1) {
         if (is_array($where)) {
             $dbType = $this->db_type;
+            $table  = $this->sanitizeIdentifier($table);
             $wheres = '';
             foreach ($where as $key => $value) {
+                $col = $this->sanitizeIdentifier($key);
                 if ($dbType == 'oracle') {
                     if (is_numeric($value)) {
-                        $wheres .= "$key=$value AND ";
+                        $wheres .= "$col=$value AND ";
                     } else {
-                        $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
+                        $wheres .= "$col='" . $this->m_escape($value) . "' AND ";
                     }
                 } else {
-                    $wheres .= "$key='" . $this->m_escape($value) . "' AND ";
+                    $wheres .= "$col='" . $this->m_escape($value) . "' AND ";
                 }
             }
             $wheres = trim($wheres, ' AND ');

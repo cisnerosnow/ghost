@@ -10,7 +10,7 @@
 | # | Vulnerabilidad | Severidad | Estado |
 |---|---------------|-----------|--------|
 | 1 | SQL Injection — valores sin escapar | 🔴 Crítico | ✅ Resuelto |
-| 2 | Inyección de nombre de tabla/columna | 🔴 Crítico | ⬜ Pendiente |
+| 2 | Inyección de nombre de tabla/columna | 🔴 Crítico | ✅ Resuelto |
 | 3 | Credenciales expuestas en error de conexión | 🟠 Alto | ⬜ Pendiente |
 | 4 | Upload sin validación de tipo de archivo | 🟠 Alto | ⬜ Pendiente |
 | 5 | CORS completamente abierto (`*`) | 🟠 Alto | ⬜ Pendiente |
@@ -52,7 +52,7 @@ Reemplazar la construcción de queries por string con `mysqli_real_escape_string
 
 ### ✅ Issue #2 — Inyección de nombre de tabla y columna
 **Severidad:** 🔴 Crítico
-**Estado:** ⬜ Pendiente
+**Estado:** ✅ Resuelto — 2026-02-21
 **Archivos:** `ghost.php`
 **Líneas afectadas:** 489, 508-511, 1272, 1284
 
