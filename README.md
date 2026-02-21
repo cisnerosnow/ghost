@@ -8,8 +8,9 @@
 
 ## Requirements
 
-- PHP 7.0+
+- PHP 7.0+ (with `random_bytes` or OpenSSL extension for `createToken()`)
 - MySQLi extension (for MySQL), MSSQL driver, or OCI8 (for Oracle)
+- `fileinfo` extension (recommended, for MIME validation in `save_file()`)
 
 ---
 
@@ -54,6 +55,17 @@ Selects the database engine. Default is `mysql`.
 ```php
 $ghost->set_db_type('oracle');
 ```
+
+### CORS — `$allowedOrigins`
+
+By default Ghost sends no CORS headers (same-origin only). Set `$allowedOrigins` to an explicit list of allowed origins before calling `run()`:
+
+```php
+$ghost->allowedOrigins = ['https://myapp.com', 'https://admin.myapp.com'];
+$ghost->run();
+```
+
+Only requests whose `Origin` header matches an entry in the list will receive an `Access-Control-Allow-Origin` response header. An empty array means no cross-origin access is granted.
 
 ---
 
@@ -281,19 +293,29 @@ Merges two result arrays by a shared key — like a PHP-side JOIN.
 
 ### `createToken($length)`
 
-Generates a cryptographically secure random token.
+Generates a cryptographically secure random token using `random_bytes()` (PHP 7+) or `openssl_random_pseudo_bytes()` as fallback. Throws a `RuntimeException` if neither is available.
 
 ```php
 $token = $ghost->createToken(32);
 ```
 
-### `save_file($fileParam, $path)`
+### `save_file($fileParam, $path, $allowedExtensions)`
 
 Moves an uploaded file to `$path` (or `uploads/` by default) with a random name.
 
+Validates the file extension against `$allowedExtensions` and verifies the real MIME type using `finfo_file()` to prevent disguised uploads (e.g. a `.php` renamed to `.jpg`).
+
+Default allowed extensions: `jpg`, `jpeg`, `png`, `gif`, `pdf`, `xlsx`, `xls`, `csv`, `txt`, `doc`, `docx`.
+
 ```php
+// Use default whitelist
 $path = $ghost->save_file($_FILES['avatar'], 'uploads/avatars/');
+
+// Custom whitelist
+$path = $ghost->save_file($_FILES['document'], 'uploads/docs/', ['pdf', 'docx']);
 ```
+
+Returns the final file path on success, or `FALSE` if the extension/MIME is not allowed or the move fails.
 
 ### `validateDate($date, $format)`
 
@@ -316,3 +338,9 @@ $ghost->validateDate('15/01/2024', 'd/m/Y'); // TRUE
 | `$ghost->method` | string | HTTP method in lowercase |
 | `$ghost->con` | resource | Active database connection |
 | `$ghost->files` | array | Names of uploaded file fields |
+
+## Configurable properties
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `$ghost->allowedOrigins` | `[]` | List of allowed CORS origins. Empty = no CORS headers sent |
